@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>产品报价规则 · 登录</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <h1>产品报价规则</h1>
+    <p class="login-sub">商务登录后维护销售生成器使用的折扣和返佣</p>
+    <form id="loginForm" autocomplete="off">
+      <label>
+        <span>用户名</span>
+        <input id="username" required autofocus>
+      </label>
+      <label>
+        <span>密码</span>
+        <input id="password" type="password" required>
+      </label>
+      <button class="primary" type="submit">登录</button>
+      <p class="login-msg" id="loginMsg" aria-live="polite"></p>
+    </form>
+    <p class="login-foot"><a href="/">返回销售生成器</a></p>
+  </main>
+  <script>
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('loginMsg');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      msg.textContent = '';
+      const body = {
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+      };
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (data.code === 0) {
+        window.location.href = '/admin';
+      } else {
+        msg.textContent = data.msg || '登录失败';
+      }
+    });
+  </script>
+</body>
+</html>

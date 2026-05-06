@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>产品报价规则</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1>产品报价规则</h1>
+      <span class="muted" id="userInfo"></span>
+    </div>
+    <div class="topbar-right">
+      <a class="ghost" href="/">销售生成器</a>
+      <button class="ghost" id="logoutBtn">退出</button>
+    </div>
+  </header>
+
+  <main class="admin-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <span>场景</span>
+        <button class="primary small" id="addProductBtn">+ 新增产品</button>
+      </div>
+      <ul class="scenario-list" id="scenarioList"></ul>
+      <div class="sidebar-section">
+        <div class="sidebar-head"><span>销售上报缺失</span></div>
+        <ul class="missing-list" id="missingList"><li class="muted">暂无</li></ul>
+      </div>
+    </aside>
+
+    <section class="content">
+      <div class="toolbar">
+        <input id="searchInput" placeholder="搜索产品名">
+        <span class="muted" id="countText"></span>
+      </div>
+      <div class="rule-table-wrap">
+        <table class="rule-table">
+          <thead>
+            <tr>
+              <th class="col-name">产品名称</th>
+              <th>常规折扣</th>
+              <th>常规返佣</th>
+              <th>特批折扣</th>
+              <th>特批返佣</th>
+              <th>返佣支持</th>
+              <th>说明</th>
+              <th>最近调整</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ruleTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="productDialog">
+    <form method="dialog" id="productForm">
+      <h2 id="dialogTitle">新增产品</h2>
+      <label>
+        <span>产品名称</span>
+        <input id="dlgName" required>
+      </label>
+      <label>
+        <span>所属场景</span>
+        <select id="dlgScenario" required></select>
+      </label>
+      <label>
+        <span>别名（逗号分隔）</span>
+        <input id="dlgAliases" placeholder="例如：海螺,hailuo">
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost">取消</button>
+        <button value="confirm" class="primary" id="dlgSubmit">保存产品</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='admin.js') }}"></script>
+</body>
+</html>

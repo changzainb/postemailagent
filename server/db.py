@@ -1,0 +1,34 @@
+import os
+import sqlite3
+from pathlib import Path
+from flask import g
+
+ROOT = Path(__file__).resolve().parent
+DB_PATH = Path(os.environ.get("POSTEMAIL_DB", ROOT / "data" / "rules.db"))
+SCHEMA_PATH = ROOT / "schema.sql"
+
+
+def get_db():
+    if "db" not in g:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        g.db = conn
+    return g.db
+
+
+def close_db(_exc=None):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        conn.commit()
+    finally:
+        conn.close()

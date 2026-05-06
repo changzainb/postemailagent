@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>特批价格邮件生成器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="workspace" aria-label="特批价格邮件生成器">
+      <div class="panel form-panel">
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">腾讯云代理商</p>
+            <h1>特批价格邮件生成器</h1>
+          </div>
+          <button class="ghost-button" id="resetButton" type="button">重置</button>
+        </header>
+
+        <details class="compact-section" open>
+          <summary>客户与项目</summary>
+          <div class="field-grid compact-grid">
+            <label>
+              <span>客户行业/业务</span>
+              <input id="industryInput" list="industryOptions" value="漫剧 / 短剧 / AIGC 内容制作" placeholder="例如：漫剧、短剧、游戏、社交、SaaS">
+              <datalist id="industryOptions">
+                <option value="漫剧 / 短剧 / AIGC 内容制作"></option>
+              </datalist>
+            </label>
+            <label>
+              <span>客户公司全称</span>
+              <input id="customerName" value="广州xx网络科技有限公司">
+            </label>
+            <label>
+              <span>项目编号</span>
+              <input id="projectName" value="20260417xxxxxxx">
+            </label>
+            <label>
+              <span>客户腾讯云账号 ID</span>
+              <input id="customerAccount" value="2479xxxxxx">
+            </label>
+            <label>
+              <span>申请开始日期</span>
+              <input id="startDate" type="date">
+            </label>
+            <label>
+              <span>申请结束日期</span>
+              <input id="endDate" type="date">
+            </label>
+            <label class="button-field">
+              <span>产品匹配</span>
+              <button class="primary-button" id="matchProductsButton" type="button">自动匹配产品</button>
+            </label>
+          </div>
+          <div class="fixed-info" aria-label="固定申请信息">
+            <span>代理商：<strong id="agentNameText">广州西骋网络科技有限公司</strong></span>
+            <span>代理商账号：<strong id="agentAccountText">2677906140</strong></span>
+            <span>渠道经理称呼：<strong id="managerTitleText">腾讯云渠道经理</strong></span>
+          </div>
+          <input id="agentName" type="hidden" value="广州西骋网络科技有限公司">
+          <input id="agentAccount" type="hidden" value="2677906140">
+          <input id="managerTitle" type="hidden" value="腾讯云渠道经理">
+        </details>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>申请产品</h2>
+              <p class="match-status" id="matchStatus">已匹配：漫剧 / 短剧 / AIGC 内容制作</p>
+            </div>
+            <button class="primary-button" id="addProductButton" type="button">新增产品</button>
+          </div>
+          <div class="product-header" aria-hidden="true">
+            <span>序号</span>
+            <span>产品名称</span>
+            <span>折扣策略</span>
+            <span>折扣</span>
+            <span>返佣</span>
+            <span></span>
+          </div>
+          <div class="product-list" id="productList"></div>
+        </section>
+
+        <details class="compact-section reasons-section">
+          <summary>申请理由</summary>
+          <div class="section-heading inline-heading">
+            <span>填素材，系统润色成邮件理由</span>
+            <button class="ghost-button" id="restoreReasonsButton" type="button">生成理由</button>
+          </div>
+          <div class="field-grid reason-input-grid">
+            <label>
+              <span>成立年份</span>
+              <input id="foundedYear" placeholder="例如：2018">
+            </label>
+            <label>
+              <span>公司规模</span>
+              <input id="companyScale" value="约300人，多地设有业务团队" placeholder="例如：100人、实缴资本1000万">
+            </label>
+            <label>
+              <span>目前项目情况</span>
+              <input id="currentProject" value="正在推进AIGC内容制作项目，已进入测试和选型阶段" placeholder="例如：做语音房、短剧、AIGC生图">
+            </label>
+          </div>
+          <label class="textarea-label">
+            <span>客户背景</span>
+            <textarea id="customerBackground" rows="4">广州xx网络科技有限公司，公司规模约300人，多地设有业务团队，目前正在推进AIGC内容制作项目。</textarea>
+          </label>
+          <label class="textarea-label">
+            <span>项目背景</span>
+            <textarea id="projectBackground" rows="3">客户当前项目已进入测试、选型和成本测算阶段，需要更有竞争力的商务条件，支撑后续规模化使用。</textarea>
+          </label>
+          <label class="textarea-label">
+            <span>竞争对手情况</span>
+            <textarea id="competition" rows="3" readonly>其他友商都有给客户报价</textarea>
+          </label>
+          <label class="textarea-label">
+            <span>代理商贡献说明</span>
+            <textarea id="agentContribution" rows="4" readonly>代理商能提供本地化服务，帮助客户提供测试、选型，以及在产品上问题的解答和服务的跟进，同时代理商在引导客户新项目更多的转向腾讯云等起了关键作用，比如客情攻关及技术服务。</textarea>
+          </label>
+        </details>
+      </div>
+
+      <aside class="panel output-panel">
+        <header class="panel-header compact">
+          <div>
+            <p class="eyebrow">生成结果</p>
+            <h2>可直接复制到邮件</h2>
+          </div>
+        </header>
+        <label>
+          <span>邮件标题</span>
+          <input id="emailSubject" readonly>
+        </label>
+        <section class="alert-box" id="thresholdBox" aria-live="polite">
+          <div class="alert-title">阈值提醒</div>
+          <ul id="thresholdList"></ul>
+        </section>
+        <label class="textarea-label output-area">
+          <span>邮件正文</span>
+          <textarea id="emailBody" readonly></textarea>
+        </label>
+        <div class="action-row">
+          <button class="primary-button" id="copySubjectButton" type="button">复制标题</button>
+          <button class="primary-button" id="copyBodyButton" type="button">复制正文</button>
+        </div>
+        <p class="status" id="copyStatus" aria-live="polite"></p>
+      </aside>
+    </section>
+  </main>
+
+  <template id="productRowTemplate">
+    <article class="product-row">
+      <div class="product-index"></div>
+      <label>
+        <span>产品名称</span>
+        <input class="product-name">
+      </label>
+      <label>
+        <span>折扣策略</span>
+        <select class="product-price-mode">
+          <option value="default">默认折扣</option>
+          <option value="breakthrough">突破折扣</option>
+          <option value="original">原价</option>
+          <option value="manual">手动</option>
+        </select>
+      </label>
+      <label>
+        <span>折扣</span>
+        <input class="product-discount" placeholder="例如：95折">
+      </label>
+      <label>
+        <span>返佣</span>
+        <input class="product-commission" placeholder="例如：5%返佣 / 无返佣">
+      </label>
+      <button class="icon-button remove-product" type="button" aria-label="删除产品">×</button>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
