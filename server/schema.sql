@@ -77,3 +77,17 @@ CREATE TABLE IF NOT EXISTS industry_products (
 );
 CREATE INDEX IF NOT EXISTS idx_indprod_key ON industry_products(industry_key);
 
+-- 行业匹配变更日志
+CREATE TABLE IF NOT EXISTS industry_change_log (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  industry_key  TEXT NOT NULL,
+  added         TEXT DEFAULT '[]',     -- JSON: [{id,name}]
+  removed       TEXT DEFAULT '[]',
+  before_ids    TEXT DEFAULT '[]',     -- JSON: [id]
+  after_ids     TEXT DEFAULT '[]',
+  actor         TEXT,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_indlog_key ON industry_change_log(industry_key);
+CREATE INDEX IF NOT EXISTS idx_indlog_time ON industry_change_log(created_at DESC);
+

@@ -113,21 +113,31 @@ function productRow(p) {
   const updated = p.rule_updated_at
     ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
     : '<span class="muted" style="font-size:12px">未维护</span>';
+  const cell = (field, val, ph) => `<td>
+    <span class="cell-view" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+    <input class="cell-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="${ph}" hidden>
+  </td>`;
+  const supported = !p.no_commission;
   return `<tr data-id="${p.id}">
     <td class="col-name product-name">
       ${escapeHtml(p.name)}
       <small>${escapeHtml(p.scenario_label || '')}${(p.aliases || []).length ? ' · 别名 ' + escapeHtml((p.aliases || []).join(',')) : ''}</small>
     </td>
-    <td><input type="text" data-field="normal_discount" value="${escapeHtml(p.normal_discount || '')}" placeholder="9折"></td>
-    <td><input type="text" data-field="normal_commission" value="${escapeHtml(p.normal_commission || '')}" placeholder="5%返佣"></td>
-    <td><input type="text" data-field="breakthrough_discount" value="${escapeHtml(p.breakthrough_discount || '')}" placeholder="8折"></td>
-    <td><input type="text" data-field="breakthrough_commission" value="${escapeHtml(p.breakthrough_commission || '')}" placeholder="10%返佣"></td>
-    <td style="text-align:center" title="返佣支持"><input type="checkbox" data-field="no_commission" ${p.no_commission ? '' : 'checked'}></td>
-    <td><input type="text" data-field="remark" value="${escapeHtml(p.remark || '')}" placeholder="适用条件 / 注意事项"></td>
+    ${cell('normal_discount', p.normal_discount, '9折')}
+    ${cell('normal_commission', p.normal_commission, '5%返佣')}
+    ${cell('breakthrough_discount', p.breakthrough_discount, '8折')}
+    ${cell('breakthrough_commission', p.breakthrough_commission, '10%返佣')}
+    <td style="text-align:center" title="返佣支持">
+      <span class="cell-view" data-view="no_commission">${supported ? '✓' : '—'}</span>
+      <input class="cell-edit" type="checkbox" data-field="no_commission" ${supported ? 'checked' : ''} hidden>
+    </td>
+    ${cell('remark', p.remark, '适用条件 / 注意事项')}
     <td>${updated}</td>
     <td class="actions">
-      <button class="primary small" data-action="save" title="保存折扣返佣">保存</button>
-      <button class="icon-btn" data-action="edit" title="改产品名/场景/别名">改</button>
+      <button class="ghost small" data-action="enter-edit" title="编辑这一行">编辑</button>
+      <button class="primary small" data-action="save" title="保存改动" hidden>保存</button>
+      <button class="ghost small" data-action="cancel-edit" title="放弃改动" hidden>取消</button>
+      <button class="icon-btn" data-action="meta" title="改产品名/场景/别名">改</button>
       <button class="icon-btn danger" data-action="archive" title="停用">停</button>
     </td>
   </tr>`;
@@ -138,23 +148,37 @@ function bindRow(productId) {
   if (!row) return;
   row.querySelectorAll('input').forEach((input) => {
     input.addEventListener('input', () => row.classList.add('dirty'));
-    input.addEventListener('change', () => {
-      row.classList.add('dirty');
-      if (input.dataset.field === 'no_commission') {
-        const label = input.closest('.commission-toggle')?.querySelector('span');
-        if (label) label.textContent = input.checked ? '不支持' : '支持';
-      }
-    });
+    input.addEventListener('change', () => row.classList.add('dirty'));
+  });
+  row.querySelector('[data-action="enter-edit"]').addEventListener('click', () => setRowEditing(row, true));
+  row.querySelector('[data-action="cancel-edit"]').addEventListener('click', () => {
+    setRowEditing(row, false);
+    renderProducts(); // 还原原值
   });
   row.querySelector('[data-action="save"]').addEventListener('click', () => saveRow(row, productId));
-  row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditDialog(productId));
+  row.querySelector('[data-action="meta"]').addEventListener('click', () => openEditDialog(productId));
   row.querySelector('[data-action="archive"]').addEventListener('click', () => archiveProduct(productId));
+}
+
+function setRowEditing(row, editing) {
+  row.classList.toggle('editing', editing);
+  row.querySelectorAll('.cell-view').forEach((el) => { el.hidden = editing; });
+  row.querySelectorAll('.cell-edit').forEach((el) => { el.hidden = !editing; });
+  row.querySelector('[data-action="enter-edit"]').hidden = editing;
+  row.querySelector('[data-action="save"]').hidden = !editing;
+  row.querySelector('[data-action="cancel-edit"]').hidden = !editing;
+  row.querySelector('[data-action="meta"]').hidden = editing;
+  row.querySelector('[data-action="archive"]').hidden = editing;
+  if (editing) {
+    const first = row.querySelector('.cell-edit:not([type=checkbox])');
+    if (first) first.focus();
+  }
 }
 
 async function saveRow(row, productId) {
   row.classList.add('saving');
   const body = {};
-  row.querySelectorAll('input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
     if (input.type === 'checkbox') {

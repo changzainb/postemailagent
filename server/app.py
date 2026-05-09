@@ -19,6 +19,9 @@ def create_app():
 
     if not DB_PATH.exists():
         init_db()
+    else:
+        # 增量补建新表（schema 全部用 CREATE IF NOT EXISTS，幂等）
+        init_db()
 
     app.teardown_appcontext(close_db)
 
@@ -383,19 +386,81 @@ def create_app():
             return jsonify({"code": 400, "msg": "product_ids 必须是数组"}), 400
         if industry_key not in _industry_names():
             return jsonify({"code": 400, "msg": "未知行业"}), 400
+        ids = [int(x) for x in ids]
         db = get_db()
+        # 计算 diff
+        before = [r["product_id"] for r in db.execute(
+            "SELECT product_id FROM industry_products WHERE industry_key=? ORDER BY sort_order, id",
+            (industry_key,),
+        ).fetchall()]
+        before_set, after_set = set(before), set(ids)
+        added_ids = [pid for pid in ids if pid not in before_set]
+        removed_ids = [pid for pid in before if pid not in after_set]
+        # 查名字
+        def _names(id_list):
+            if not id_list:
+                return []
+            placeholders = ",".join("?" * len(id_list))
+            rows = db.execute(
+                f"SELECT id, name FROM products WHERE id IN ({placeholders})", id_list
+            ).fetchall()
+            name_map = {r["id"]: r["name"] for r in rows}
+            return [{"id": pid, "name": name_map.get(pid, f"#{pid}")} for pid in id_list]
+        added = _names(added_ids)
+        removed = _names(removed_ids)
         try:
             db.execute("DELETE FROM industry_products WHERE industry_key=?", (industry_key,))
             for idx, pid in enumerate(ids):
                 db.execute(
                     "INSERT INTO industry_products(industry_key, product_id, sort_order) VALUES (?, ?, ?)",
-                    (industry_key, int(pid), idx),
+                    (industry_key, pid, idx),
+                )
+            # 仅当发生变化时写日志
+            if added or removed:
+                user = current_user() or {}
+                db.execute(
+                    "INSERT INTO industry_change_log(industry_key, added, removed, before_ids, after_ids, actor) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        industry_key,
+                        json.dumps(added, ensure_ascii=False),
+                        json.dumps(removed, ensure_ascii=False),
+                        json.dumps(before, ensure_ascii=False),
+                        json.dumps(ids, ensure_ascii=False),
+                        user.get("username", ""),
+                    ),
                 )
             db.commit()
         except Exception as exc:
             db.rollback()
             return jsonify({"code": 500, "msg": f"保存失败：{exc}"}), 500
-        return jsonify({"code": 0, "data": {"saved": len(ids)}})
+        return jsonify({"code": 0, "data": {
+            "saved": len(ids),
+            "added": added,
+            "removed": removed,
+            "changed": bool(added or removed),
+        }})
+
+    @app.get("/api/industries/change-log")
+    @require_role("admin")
+    def api_industry_change_log():
+        key = request.args.get("industry_key", "").strip()
+        limit = min(int(request.args.get("limit", 100) or 100), 500)
+        sql = "SELECT id, industry_key, added, removed, actor, created_at FROM industry_change_log "
+        params = []
+        if key:
+            sql += "WHERE industry_key=? "
+            params.append(key)
+        sql += "ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(limit)
+        rows = get_db().execute(sql, params).fetchall()
+        data = []
+        for r in rows:
+            d = dict(r)
+            d["added"] = json.loads(d.get("added") or "[]")
+            d["removed"] = json.loads(d.get("removed") or "[]")
+            data.append(d)
+        return jsonify({"code": 0, "data": data})
 
     return app
 

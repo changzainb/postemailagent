@@ -202,10 +202,16 @@ a:hover { text-decoration: underline; }
 .rule-table .product-name { font-weight: 500; line-height: 1.35; }
 .rule-table .product-name small { display: block; color: var(--muted); font-weight: 400; margin-top: 2px; font-size: 11.5px; }
 .rule-table tr.dirty { background: #fffaf2; }
+.rule-table tr.editing { background: #f5faff; }
 .rule-table tr.saving { opacity: 0.7; }
+.rule-table .cell-view { display: inline-block; min-height: 22px; line-height: 22px; color: #1f2937; font-size: 12.5px; }
+.rule-table .cell-view .muted { color: #94a3b8; }
+.rule-table [hidden] { display: none !important; }
 .rule-table .meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; line-height: 1.4; }
-.rule-table .meta b { display: block; color: #344054; font-weight: 500; }
+.rule-table .meta b { display: block; color: #344054; font-weight: 500; font-size: 12px; }
+.rule-table td { word-break: keep-all; }
 .rule-table .actions { white-space: nowrap; display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
+.rule-table .actions [hidden] { display: none !important; }
 .rule-table .actions button { padding: 4px 9px; font-size: 12px; border-radius: 5px; }
 .rule-table .actions .icon-btn { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--line); color: #475569; cursor: pointer; }
 .rule-table .actions .icon-btn:hover { background: #f3f4f6; color: #111827; }
