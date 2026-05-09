@@ -190,6 +190,16 @@ a:hover { text-decoration: underline; }
   font-size: 12.5px;
 }
 .rule-table .col-name { min-width: 220px; }
+.rule-table .col-check { text-align: center; padding-left: 10px; padding-right: 0; }
+.rule-table .col-center, .rule-table td.col-center { text-align: center; }
+.rule-table .col-actions { text-align: right; padding-right: 10px; }
+.rule-table thead th.col-actions, .rule-table td.actions {
+  position: sticky; right: 0; background: #fff; z-index: 1;
+  box-shadow: -6px 0 8px -6px rgba(15, 23, 42, 0.08);
+}
+.rule-table thead th.col-actions { background: var(--panel-strong); z-index: 2; }
+.rule-table tr.editing td.actions { background: #f5faff; }
+.rule-table tr.dirty td.actions { background: #fffaf2; }
 .rule-table input[type="text"] {
   width: 100%;
   height: 28px;
@@ -210,12 +220,17 @@ a:hover { text-decoration: underline; }
 .rule-table .meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; line-height: 1.4; }
 .rule-table .meta b { display: block; color: #344054; font-weight: 500; font-size: 12px; }
 .rule-table td { word-break: keep-all; }
-.rule-table .actions { white-space: nowrap; display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
+.rule-table .actions { white-space: nowrap; text-align: right; padding-right: 10px; }
 .rule-table .actions [hidden] { display: none !important; }
-.rule-table .actions button { padding: 4px 9px; font-size: 12px; border-radius: 5px; }
-.rule-table .actions .icon-btn { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--line); color: #475569; cursor: pointer; }
+.rule-table .actions button { padding: 4px 9px; font-size: 12px; border-radius: 5px; margin-left: 4px; }
+.rule-table .actions button:first-of-type { margin-left: 0; }
+.rule-table .actions .icon-btn { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--line); color: #475569; cursor: pointer; vertical-align: middle; }
 .rule-table .actions .icon-btn:hover { background: #f3f4f6; color: #111827; }
-.rule-table .actions .icon-btn.danger:hover { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.rule-table .actions .icon-btn.danger { color: #b91c1c; border-color: #fecaca; }
+.rule-table .actions .icon-btn.danger:hover { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+.toolbar .ghost.danger { color: #b91c1c; border-color: #fecaca; }
+.toolbar .ghost.danger:hover:not(:disabled) { background: #fef2f2; border-color: #fca5a5; }
+.toolbar .ghost.danger:disabled { color: #cbd5e1; border-color: #e5e7eb; cursor: not-allowed; background: #f9fafb; }
 
 .commission-toggle {
   display: inline-flex;

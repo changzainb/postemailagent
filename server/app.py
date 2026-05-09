@@ -172,12 +172,26 @@ def create_app():
     @require_role("business", "admin")
     def api_products_delete(product_id):
         db = get_db()
-        db.execute(
-            "UPDATE products SET status='archived', updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (product_id,),
-        )
+        # rule_history 无外键，先手动清
+        db.execute("DELETE FROM rule_history WHERE product_id=?", (product_id,))
+        # pricing_rules / industry_products 走 ON DELETE CASCADE
+        db.execute("DELETE FROM products WHERE id=?", (product_id,))
         db.commit()
         return jsonify({"code": 0})
+
+    @app.post("/api/products/batch-delete")
+    @require_role("business", "admin")
+    def api_products_batch_delete():
+        body = request.get_json(silent=True) or {}
+        ids = [int(x) for x in (body.get("ids") or []) if str(x).isdigit() or isinstance(x, int)]
+        if not ids:
+            return jsonify({"code": 1, "msg": "ids 不能为空"}), 400
+        db = get_db()
+        placeholders = ",".join(["?"] * len(ids))
+        db.execute(f"DELETE FROM rule_history WHERE product_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM products WHERE id IN ({placeholders})", ids)
+        db.commit()
+        return jsonify({"code": 0, "data": {"deleted": len(ids)}})
 
     @app.put("/api/products/<int:product_id>/rule")
     @require_role("business", "admin")

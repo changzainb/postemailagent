@@ -3,6 +3,7 @@ const state = {
   products: [],
   filterScenario: null,
   filterKeyword: '',
+  selectedIds: new Set(),
 };
 
 const els = {
@@ -104,9 +105,30 @@ function renderProducts() {
     if (keyword && !p.name.toLowerCase().includes(keyword)) return false;
     return true;
   });
+  // 把不在当前列表里的选中清掉，避免误删
+  const visibleIds = new Set(filtered.map((p) => p.id));
+  for (const id of [...state.selectedIds]) {
+    if (!visibleIds.has(id)) state.selectedIds.delete(id);
+  }
   els.countText.textContent = `共 ${filtered.length} 个产品`;
   els.ruleBody.innerHTML = filtered.map(productRow).join('');
   filtered.forEach((p) => bindRow(p.id));
+  syncSelectionUI(filtered);
+}
+
+function syncSelectionUI(filtered) {
+  const total = filtered.length;
+  const selected = state.selectedIds.size;
+  const selectAll = document.getElementById('selectAll');
+  if (selectAll) {
+    selectAll.checked = total > 0 && selected === total;
+    selectAll.indeterminate = selected > 0 && selected < total;
+  }
+  const btn = document.getElementById('batchDeleteBtn');
+  if (btn) {
+    btn.disabled = selected === 0;
+    btn.textContent = selected ? `批量删除 (${selected})` : '批量删除';
+  }
 }
 
 function productRow(p) {
@@ -118,7 +140,9 @@ function productRow(p) {
     <input class="cell-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="${ph}" hidden>
   </td>`;
   const supported = !p.no_commission;
+  const checked = state.selectedIds.has(p.id) ? 'checked' : '';
   return `<tr data-id="${p.id}">
+    <td class="col-check"><input type="checkbox" class="row-check" data-id="${p.id}" ${checked}></td>
     <td class="col-name product-name">
       ${escapeHtml(p.name)}
       <small>${escapeHtml(p.scenario_label || '')}${(p.aliases || []).length ? ' · 别名 ' + escapeHtml((p.aliases || []).join(',')) : ''}</small>
@@ -127,7 +151,7 @@ function productRow(p) {
     ${cell('normal_commission', p.normal_commission, '5%返佣')}
     ${cell('breakthrough_discount', p.breakthrough_discount, '8折')}
     ${cell('breakthrough_commission', p.breakthrough_commission, '10%返佣')}
-    <td style="text-align:center" title="返佣支持">
+    <td class="col-center" title="返佣支持">
       <span class="cell-view" data-view="no_commission">${supported ? '✓' : '—'}</span>
       <input class="cell-edit" type="checkbox" data-field="no_commission" ${supported ? 'checked' : ''} hidden>
     </td>
@@ -138,7 +162,7 @@ function productRow(p) {
       <button class="primary small" data-action="save" title="保存改动" hidden>保存</button>
       <button class="ghost small" data-action="cancel-edit" title="放弃改动" hidden>取消</button>
       <button class="icon-btn" data-action="meta" title="改产品名/场景/别名">改</button>
-      <button class="icon-btn danger" data-action="archive" title="停用">停</button>
+      <button class="icon-btn danger" data-action="delete" title="删除产品">删</button>
     </td>
   </tr>`;
 }
@@ -146,9 +170,15 @@ function productRow(p) {
 function bindRow(productId) {
   const row = els.ruleBody.querySelector(`tr[data-id="${productId}"]`);
   if (!row) return;
-  row.querySelectorAll('input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit').forEach((input) => {
     input.addEventListener('input', () => row.classList.add('dirty'));
     input.addEventListener('change', () => row.classList.add('dirty'));
+  });
+  const checkbox = row.querySelector('input.row-check');
+  checkbox.addEventListener('change', () => {
+    if (checkbox.checked) state.selectedIds.add(productId);
+    else state.selectedIds.delete(productId);
+    syncSelectionUI(filteredProducts());
   });
   row.querySelector('[data-action="enter-edit"]').addEventListener('click', () => setRowEditing(row, true));
   row.querySelector('[data-action="cancel-edit"]').addEventListener('click', () => {
@@ -157,7 +187,16 @@ function bindRow(productId) {
   });
   row.querySelector('[data-action="save"]').addEventListener('click', () => saveRow(row, productId));
   row.querySelector('[data-action="meta"]').addEventListener('click', () => openEditDialog(productId));
-  row.querySelector('[data-action="archive"]').addEventListener('click', () => archiveProduct(productId));
+  row.querySelector('[data-action="delete"]').addEventListener('click', () => deleteProduct(productId));
+}
+
+function filteredProducts() {
+  const keyword = state.filterKeyword.trim().toLowerCase();
+  return state.products.filter((p) => {
+    if (state.filterScenario && p.scenario_id !== state.filterScenario) return false;
+    if (keyword && !p.name.toLowerCase().includes(keyword)) return false;
+    return true;
+  });
 }
 
 function setRowEditing(row, editing) {
@@ -168,7 +207,7 @@ function setRowEditing(row, editing) {
   row.querySelector('[data-action="save"]').hidden = !editing;
   row.querySelector('[data-action="cancel-edit"]').hidden = !editing;
   row.querySelector('[data-action="meta"]').hidden = editing;
-  row.querySelector('[data-action="archive"]').hidden = editing;
+  row.querySelector('[data-action="delete"]').hidden = editing;
   if (editing) {
     const first = row.querySelector('.cell-edit:not([type=checkbox])');
     if (first) first.focus();
@@ -201,13 +240,32 @@ async function saveRow(row, productId) {
   }
 }
 
-async function archiveProduct(productId) {
-  if (!confirm('停用后，销售生成器里不再显示这个产品。确定停用吗？')) return;
+async function deleteProduct(productId) {
+  const p = state.products.find((x) => x.id === productId);
+  const name = p ? p.name : `#${productId}`;
+  if (!confirm(`确认删除「${name}」？\n该产品的报价规则、变更历史、行业匹配会一起清掉，无法恢复。`)) return;
   const resp = await fetchJson(`/api/products/${productId}`, {method: 'DELETE'});
   if (resp.code === 0) {
+    state.selectedIds.delete(productId);
     await refreshProducts();
   } else {
-    alert(resp.msg || '停用失败');
+    alert(resp.msg || '删除失败');
+  }
+}
+
+async function batchDelete() {
+  const ids = [...state.selectedIds];
+  if (!ids.length) return;
+  if (!confirm(`确认批量删除 ${ids.length} 个产品？\n相关报价规则、变更历史、行业匹配会一起清掉，无法恢复。`)) return;
+  const resp = await fetchJson('/api/products/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ids}),
+  });
+  if (resp.code === 0) {
+    state.selectedIds.clear();
+    await refreshProducts();
+  } else {
+    alert(resp.msg || '批量删除失败');
   }
 }
 
@@ -278,6 +336,15 @@ els.logoutBtn.addEventListener('click', async () => {
 document.getElementById('changeLogBtn')?.addEventListener('click', () => {
   if (window.ChangeLog) window.ChangeLog.open('rule');
 });
+
+document.getElementById('selectAll')?.addEventListener('change', (e) => {
+  const list = filteredProducts();
+  if (e.target.checked) list.forEach((p) => state.selectedIds.add(p.id));
+  else list.forEach((p) => state.selectedIds.delete(p.id));
+  renderProducts();
+});
+
+document.getElementById('batchDeleteBtn')?.addEventListener('click', batchDelete);
 
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({
