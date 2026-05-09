@@ -131,6 +131,7 @@ function syncSelectionUI(filtered) {
   }
   const cancelBtn = document.getElementById('batchCancelBtn');
   if (cancelBtn) cancelBtn.hidden = !state.batchDeleteMode;
+  document.querySelector('.toolbar')?.classList.toggle('batch-active', state.batchDeleteMode);
 }
 
 function normalizeBillingModes(modes) {
@@ -142,6 +143,13 @@ function normalizeBillingModes(modes) {
 function billingModeText(modes) {
   const labels = {prepaid: '预付费', postpaid: '后付费'};
   return normalizeBillingModes(modes).map((x) => labels[x]).join(' / ');
+}
+
+function billingModeBadges(modes) {
+  const labels = {prepaid: '预付费', postpaid: '后付费'};
+  return normalizeBillingModes(modes).map((x) =>
+    `<span class="billing-badge">${labels[x]}</span>`
+  ).join('');
 }
 
 function parseDiscountNum(s) {
@@ -157,19 +165,23 @@ function productRow(p) {
   const updated = p.rule_updated_at
     ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
     : '<span class="muted" style="font-size:12px">未维护</span>';
-  const cell = (field, val, ph) => `<td>
-    <span class="cell-view" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
-    <input class="cell-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="${ph}" hidden>
+  const remarkCell = (val) => `<td class="remark-cell">
+    <div class="cell-view remark-view" data-view="remark">
+      <span class="remark-text">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+    </div>
+    <textarea class="cell-edit remark-edit" data-field="remark" rows="3" placeholder="适用条件 / 注意事项" hidden>${escapeHtml(val || '')}</textarea>
+    <div class="update-meta">${updated}</div>
   </td>`;
-  const numCell = (field, val, suffix, ph) => {
+  const numBox = (field, label, val, suffix, ph) => {
     const num = suffix === '折' ? parseDiscountNum(val) : parseCommissionNum(val);
-    return `<td>
-      <span class="cell-view" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+    return `<div class="rule-item">
+      <span class="rule-label">${label}</span>
+      <span class="cell-view rule-value" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
       <span class="cell-edit input-suffix" data-suffix-field="${field}" hidden>
         <input type="text" inputmode="decimal" data-field="${field}" data-suffix="${suffix}" value="${escapeHtml(num)}" placeholder="${ph}">
         <span class="suffix">${suffix}</span>
       </span>
-    </td>`;
+    </div>`;
   };
   const supported = !p.no_commission;
   const checked = state.selectedIds.has(p.id) ? 'checked' : '';
@@ -180,23 +192,28 @@ function productRow(p) {
       ${escapeHtml(p.name)}
       <small>${escapeHtml(p.scenario_label || '')}${(p.aliases || []).length ? ' · 别名 ' + escapeHtml((p.aliases || []).join(',')) : ''}</small>
     </td>
-    <td>
-      <span class="cell-view billing-mode-view" data-view="billing_modes">${escapeHtml(billingModeText(billingModes))}</span>
-      <div class="cell-edit billing-mode-edit" hidden>
-        <label><input type="checkbox" data-field="billing_modes" data-mode="prepaid" ${billingModes.includes('prepaid') ? 'checked' : ''}>预付费</label>
-        <label><input type="checkbox" data-field="billing_modes" data-mode="postpaid" ${billingModes.includes('postpaid') ? 'checked' : ''}>后付费</label>
+    <td class="rule-grid-cell">
+      <div class="rule-grid">
+        <div class="rule-item rule-item-wide">
+          <span class="rule-label">计费方式</span>
+          <span class="cell-view billing-mode-view" data-view="billing_modes" title="${escapeHtml(billingModeText(billingModes))}">${billingModeBadges(billingModes)}</span>
+          <div class="cell-edit billing-mode-edit" hidden>
+            <label><input type="checkbox" data-field="billing_modes" data-mode="prepaid" ${billingModes.includes('prepaid') ? 'checked' : ''}>预付费</label>
+            <label><input type="checkbox" data-field="billing_modes" data-mode="postpaid" ${billingModes.includes('postpaid') ? 'checked' : ''}>后付费</label>
+          </div>
+        </div>
+        ${numBox('normal_discount', '常规折扣', p.normal_discount, '折', '9')}
+        ${numBox('normal_commission', '常规返佣', p.normal_commission, '%返佣', '5')}
+        ${numBox('breakthrough_discount', '突破折扣', p.breakthrough_discount, '折', '8')}
+        ${numBox('breakthrough_commission', '突破返佣', p.breakthrough_commission, '%返佣', '10')}
+        <div class="rule-item rule-support" title="返佣支持">
+          <span class="rule-label">返佣</span>
+          <span class="cell-view rule-value" data-view="no_commission">${supported ? '支持' : '不支持'}</span>
+          <label class="cell-edit commission-check" hidden><input type="checkbox" data-field="no_commission" ${supported ? 'checked' : ''}>支持</label>
+        </div>
       </div>
     </td>
-    ${numCell('normal_discount', p.normal_discount, '折', '9')}
-    ${numCell('normal_commission', p.normal_commission, '%返佣', '5')}
-    ${numCell('breakthrough_discount', p.breakthrough_discount, '折', '8')}
-    ${numCell('breakthrough_commission', p.breakthrough_commission, '%返佣', '10')}
-    <td class="col-center" title="返佣支持">
-      <span class="cell-view" data-view="no_commission">${supported ? '✓' : '—'}</span>
-      <input class="cell-edit" type="checkbox" data-field="no_commission" ${supported ? 'checked' : ''} hidden>
-    </td>
-    ${cell('remark', p.remark, '适用条件 / 注意事项')}
-    <td>${updated}</td>
+    ${remarkCell(p.remark)}
     <td class="actions">
       <button class="ghost small" data-action="enter-edit" title="编辑这一行">编辑</button>
       <button class="primary small" data-action="save" title="保存改动" hidden>保存</button>
@@ -210,7 +227,7 @@ function productRow(p) {
 function bindRow(productId) {
   const row = els.ruleBody.querySelector(`tr[data-id="${productId}"]`);
   if (!row) return;
-  row.querySelectorAll('input.cell-edit, .input-suffix input, .billing-mode-edit input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
     input.addEventListener('input', () => row.classList.add('dirty'));
     input.addEventListener('change', () => row.classList.add('dirty'));
   });
@@ -258,7 +275,7 @@ function setRowEditing(row, editing) {
   row.querySelector('[data-action="meta"]').hidden = editing;
   row.querySelector('[data-action="delete"]').hidden = editing;
   if (editing) {
-    const first = row.querySelector('.input-suffix input, input.cell-edit:not([type=checkbox])');
+    const first = row.querySelector('.input-suffix input, textarea.cell-edit, input.cell-edit:not([type=checkbox])');
     if (first) first.focus();
   }
 }
@@ -266,7 +283,7 @@ function setRowEditing(row, editing) {
 async function saveRow(row, productId) {
   row.classList.add('saving');
   const body = {billing_modes: []};
-  row.querySelectorAll('input.cell-edit, .input-suffix input, .billing-mode-edit input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
     if (field === 'billing_modes') {

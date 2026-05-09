@@ -152,7 +152,12 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
+.toolbar.batch-active { background: #fff8f6; border-color: #fed7d2; }
 .toolbar input {
   flex: 1;
   height: 32px;
@@ -171,14 +176,16 @@ a:hover { text-decoration: underline; }
 }
 .rule-table {
   width: 100%;
+  min-width: 0;
   border-collapse: collapse;
   background: #fff;
   font-size: 13px;
+  table-layout: fixed;
 }
 .rule-table th, .rule-table td {
-  padding: 8px 6px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--line-soft);
-  vertical-align: middle;
+  vertical-align: top;
   text-align: left;
 }
 .rule-table thead th {
@@ -191,26 +198,29 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
   font-size: 12.5px;
 }
-.rule-table .col-name { min-width: 220px; }
+.rule-table .col-name { min-width: 0; }
 .rule-table .col-check { text-align: center; padding-left: 10px; padding-right: 0; }
-.rule-table:not(.batch-mode) .col-check { display: none; }
+.rule-table:not(.batch-mode) .col-check input { visibility: hidden; pointer-events: none; }
 .rule-table .col-center, .rule-table td.col-center { text-align: center; }
 .rule-table .col-actions { text-align: right; padding-right: 10px; }
-.rule-table thead th.col-actions, .rule-table td.actions {
-  position: sticky; right: 0; background: #fff; z-index: 1;
-  box-shadow: -6px 0 8px -6px rgba(15, 23, 42, 0.08);
-}
-.rule-table thead th.col-actions { background: var(--panel-strong); z-index: 2; }
+.rule-table thead th.col-actions, .rule-table td.actions { background: #fff; }
+.rule-table thead th.col-actions { background: var(--panel-strong); }
 .rule-table tr.editing td.actions { background: #f5faff; }
 .rule-table tr.dirty td.actions { background: #fffaf2; }
-.rule-table input[type="text"] {
+.rule-table input[type="text"], .rule-table textarea {
   width: 100%;
-  height: 28px;
   padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #fff;
   font-size: 12.5px;
+}
+.rule-table input[type="text"] { height: 28px; }
+.rule-table textarea {
+  min-height: 72px;
+  padding: 6px 8px;
+  resize: vertical;
+  line-height: 1.45;
 }
 .rule-table .product-name { font-weight: 500; line-height: 1.35; }
 .rule-table .product-name small { display: block; color: var(--muted); font-weight: 400; margin-top: 2px; font-size: 11.5px; }
@@ -220,21 +230,67 @@ a:hover { text-decoration: underline; }
 .rule-table .cell-view { display: inline-block; min-height: 22px; line-height: 22px; color: #1f2937; font-size: 12.5px; }
 .rule-table .cell-view .muted { color: #94a3b8; }
 .rule-table [hidden] { display: none !important; }
-.billing-mode-view { color: #344054; white-space: nowrap; }
+.billing-mode-view { display: flex; flex-wrap: wrap; gap: 4px; color: #344054; white-space: normal; }
+.billing-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid #d8e0ea;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  white-space: nowrap;
+}
 .billing-mode-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   color: #344054;
   font-size: 12px;
   line-height: 1.2;
 }
 .billing-mode-edit label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.rule-grid-cell { min-width: 0; }
+.rule-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 8px;
+  align-items: start;
+}
+.rule-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+.rule-item-wide { grid-column: 1 / -1; }
+.rule-label {
+  color: #667085;
+  font-size: 11.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.rule-value {
+  min-width: 0;
+  color: #1f2937;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.commission-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #344054;
+}
 .rule-table .input-suffix {
   display: inline-flex;
   align-items: stretch;
   width: 100%;
-  max-width: 88px;
+  min-width: 82px;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #fff;
@@ -254,9 +310,11 @@ a:hover { text-decoration: underline; }
 .rule-table .input-suffix .suffix {
   display: inline-flex;
   align-items: center;
-  padding: 0 6px;
-  background: #f1f5f9;
-  color: #475569;
+  min-width: 24px;
+  justify-content: center;
+  padding: 0 7px;
+  background: #f8fafc;
+  color: #667085;
   font-size: 12px;
   border-left: 1px solid var(--line);
   white-space: nowrap;
@@ -264,9 +322,27 @@ a:hover { text-decoration: underline; }
 .rule-table .meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; line-height: 1.4; }
 .rule-table .meta b { display: block; color: #344054; font-weight: 500; font-size: 12px; }
 .rule-table td { word-break: keep-all; }
-.rule-table .actions { white-space: nowrap; text-align: right; padding-right: 10px; }
+.rule-table .product-name, .rule-table .remark-cell { word-break: normal; overflow-wrap: break-word; }
+.rule-table .product-name { white-space: normal; }
+.rule-table .remark-view {
+  display: block;
+  min-height: 22px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #344054;
+}
+.remark-text { display: block; }
+.rule-table .remark-edit { display: block; }
+.update-meta {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #e5e7eb;
+}
+.update-meta:empty { display: none; }
+.rule-table .actions { white-space: nowrap; text-align: right; padding-right: 8px; }
 .rule-table .actions [hidden] { display: none !important; }
-.rule-table .actions button { padding: 4px 9px; font-size: 12px; border-radius: 5px; margin-left: 4px; }
+.rule-table .actions button { padding: 4px 7px; font-size: 12px; border-radius: 5px; margin-left: 3px; }
 .rule-table .actions button:first-of-type { margin-left: 0; }
 .rule-table .actions .icon-btn { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--line); color: #475569; cursor: pointer; vertical-align: middle; }
 .rule-table .actions .icon-btn:hover { background: #f3f4f6; color: #111827; }
