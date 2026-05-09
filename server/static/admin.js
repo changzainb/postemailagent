@@ -144,6 +144,15 @@ function billingModeText(modes) {
   return normalizeBillingModes(modes).map((x) => labels[x]).join(' / ');
 }
 
+function parseDiscountNum(s) {
+  const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*折/);
+  return m ? m[1] : '';
+}
+function parseCommissionNum(s) {
+  const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*%/);
+  return m ? m[1] : '';
+}
+
 function productRow(p) {
   const updated = p.rule_updated_at
     ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
@@ -152,6 +161,16 @@ function productRow(p) {
     <span class="cell-view" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
     <input class="cell-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="${ph}" hidden>
   </td>`;
+  const numCell = (field, val, suffix, ph) => {
+    const num = suffix === '折' ? parseDiscountNum(val) : parseCommissionNum(val);
+    return `<td>
+      <span class="cell-view" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+      <span class="cell-edit input-suffix" data-suffix-field="${field}" hidden>
+        <input type="text" inputmode="decimal" data-field="${field}" data-suffix="${suffix}" value="${escapeHtml(num)}" placeholder="${ph}">
+        <span class="suffix">${suffix}</span>
+      </span>
+    </td>`;
+  };
   const supported = !p.no_commission;
   const checked = state.selectedIds.has(p.id) ? 'checked' : '';
   const billingModes = normalizeBillingModes(p.billing_modes);
@@ -168,10 +187,10 @@ function productRow(p) {
         <label><input type="checkbox" data-field="billing_modes" data-mode="postpaid" ${billingModes.includes('postpaid') ? 'checked' : ''}>后付费</label>
       </div>
     </td>
-    ${cell('normal_discount', p.normal_discount, '9折')}
-    ${cell('normal_commission', p.normal_commission, '5%返佣')}
-    ${cell('breakthrough_discount', p.breakthrough_discount, '8折')}
-    ${cell('breakthrough_commission', p.breakthrough_commission, '10%返佣')}
+    ${numCell('normal_discount', p.normal_discount, '折', '9')}
+    ${numCell('normal_commission', p.normal_commission, '%返佣', '5')}
+    ${numCell('breakthrough_discount', p.breakthrough_discount, '折', '8')}
+    ${numCell('breakthrough_commission', p.breakthrough_commission, '%返佣', '10')}
     <td class="col-center" title="返佣支持">
       <span class="cell-view" data-view="no_commission">${supported ? '✓' : '—'}</span>
       <input class="cell-edit" type="checkbox" data-field="no_commission" ${supported ? 'checked' : ''} hidden>
@@ -191,9 +210,16 @@ function productRow(p) {
 function bindRow(productId) {
   const row = els.ruleBody.querySelector(`tr[data-id="${productId}"]`);
   if (!row) return;
-  row.querySelectorAll('input.cell-edit').forEach((input) => {
+  row.querySelectorAll('input.cell-edit, .input-suffix input, .billing-mode-edit input').forEach((input) => {
     input.addEventListener('input', () => row.classList.add('dirty'));
     input.addEventListener('change', () => row.classList.add('dirty'));
+  });
+  // 数字输入：只允许数字和小数点
+  row.querySelectorAll('.input-suffix input').forEach((input) => {
+    input.addEventListener('input', () => {
+      const cleaned = input.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+      if (cleaned !== input.value) input.value = cleaned;
+    });
   });
   const checkbox = row.querySelector('input.row-check');
   if (checkbox) {
@@ -232,7 +258,7 @@ function setRowEditing(row, editing) {
   row.querySelector('[data-action="meta"]').hidden = editing;
   row.querySelector('[data-action="delete"]').hidden = editing;
   if (editing) {
-    const first = row.querySelector('.cell-edit:not([type=checkbox])');
+    const first = row.querySelector('.input-suffix input, input.cell-edit:not([type=checkbox])');
     if (first) first.focus();
   }
 }
@@ -240,7 +266,7 @@ function setRowEditing(row, editing) {
 async function saveRow(row, productId) {
   row.classList.add('saving');
   const body = {billing_modes: []};
-  row.querySelectorAll('input.cell-edit, .billing-mode-edit input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit, .input-suffix input, .billing-mode-edit input').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
     if (field === 'billing_modes') {
@@ -250,6 +276,9 @@ async function saveRow(row, productId) {
     if (input.type === 'checkbox') {
       // UI 复选框语义：勾 = 支持返佣；DB 字段是 no_commission（true = 不支持），需翻转
       body[field] = field === 'no_commission' ? !input.checked : input.checked;
+    } else if (input.dataset.suffix) {
+      const v = input.value.trim();
+      body[field] = v ? v + input.dataset.suffix : '';
     } else {
       body[field] = input.value;
     }
