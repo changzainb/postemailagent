@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS pricing_rules (
   normal_commission        TEXT DEFAULT '',
   breakthrough_discount    TEXT DEFAULT '',
   breakthrough_commission  TEXT DEFAULT '',
+  billing_modes            TEXT DEFAULT '["prepaid","postpaid"]',
   no_commission            INTEGER DEFAULT 0,
   remark                   TEXT DEFAULT '',
   updated_by               TEXT DEFAULT '',

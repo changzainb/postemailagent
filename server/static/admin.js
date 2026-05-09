@@ -4,6 +4,7 @@ const state = {
   filterScenario: null,
   filterKeyword: '',
   selectedIds: new Set(),
+  batchDeleteMode: false,
 };
 
 const els = {
@@ -99,18 +100,14 @@ function renderMissing(items) {
 }
 
 function renderProducts() {
-  const keyword = state.filterKeyword.trim().toLowerCase();
-  const filtered = state.products.filter((p) => {
-    if (state.filterScenario && p.scenario_id !== state.filterScenario) return false;
-    if (keyword && !p.name.toLowerCase().includes(keyword)) return false;
-    return true;
-  });
+  const filtered = filteredProducts();
   // 把不在当前列表里的选中清掉，避免误删
   const visibleIds = new Set(filtered.map((p) => p.id));
   for (const id of [...state.selectedIds]) {
     if (!visibleIds.has(id)) state.selectedIds.delete(id);
   }
   els.countText.textContent = `共 ${filtered.length} 个产品`;
+  document.querySelector('.rule-table')?.classList.toggle('batch-mode', state.batchDeleteMode);
   els.ruleBody.innerHTML = filtered.map(productRow).join('');
   filtered.forEach((p) => bindRow(p.id));
   syncSelectionUI(filtered);
@@ -121,14 +118,30 @@ function syncSelectionUI(filtered) {
   const selected = state.selectedIds.size;
   const selectAll = document.getElementById('selectAll');
   if (selectAll) {
+    selectAll.hidden = !state.batchDeleteMode;
     selectAll.checked = total > 0 && selected === total;
     selectAll.indeterminate = selected > 0 && selected < total;
   }
   const btn = document.getElementById('batchDeleteBtn');
   if (btn) {
-    btn.disabled = selected === 0;
-    btn.textContent = selected ? `批量删除 (${selected})` : '批量删除';
+    btn.disabled = state.batchDeleteMode && selected === 0;
+    btn.textContent = state.batchDeleteMode
+      ? (selected ? `确认删除 (${selected})` : '选择要删除的产品')
+      : '批量删除';
   }
+  const cancelBtn = document.getElementById('batchCancelBtn');
+  if (cancelBtn) cancelBtn.hidden = !state.batchDeleteMode;
+}
+
+function normalizeBillingModes(modes) {
+  const list = Array.isArray(modes) ? modes : ['prepaid', 'postpaid'];
+  const allowed = list.filter((x) => x === 'prepaid' || x === 'postpaid');
+  return allowed.length ? allowed : ['prepaid', 'postpaid'];
+}
+
+function billingModeText(modes) {
+  const labels = {prepaid: '预付费', postpaid: '后付费'};
+  return normalizeBillingModes(modes).map((x) => labels[x]).join(' / ');
 }
 
 function productRow(p) {
@@ -141,11 +154,19 @@ function productRow(p) {
   </td>`;
   const supported = !p.no_commission;
   const checked = state.selectedIds.has(p.id) ? 'checked' : '';
+  const billingModes = normalizeBillingModes(p.billing_modes);
   return `<tr data-id="${p.id}">
-    <td class="col-check"><input type="checkbox" class="row-check" data-id="${p.id}" ${checked}></td>
+    <td class="col-check"><input type="checkbox" class="row-check" data-id="${p.id}" ${checked} ${state.batchDeleteMode ? '' : 'hidden'}></td>
     <td class="col-name product-name">
       ${escapeHtml(p.name)}
       <small>${escapeHtml(p.scenario_label || '')}${(p.aliases || []).length ? ' · 别名 ' + escapeHtml((p.aliases || []).join(',')) : ''}</small>
+    </td>
+    <td>
+      <span class="cell-view billing-mode-view" data-view="billing_modes">${escapeHtml(billingModeText(billingModes))}</span>
+      <div class="cell-edit billing-mode-edit" hidden>
+        <label><input type="checkbox" data-field="billing_modes" data-mode="prepaid" ${billingModes.includes('prepaid') ? 'checked' : ''}>预付费</label>
+        <label><input type="checkbox" data-field="billing_modes" data-mode="postpaid" ${billingModes.includes('postpaid') ? 'checked' : ''}>后付费</label>
+      </div>
     </td>
     ${cell('normal_discount', p.normal_discount, '9折')}
     ${cell('normal_commission', p.normal_commission, '5%返佣')}
@@ -175,11 +196,13 @@ function bindRow(productId) {
     input.addEventListener('change', () => row.classList.add('dirty'));
   });
   const checkbox = row.querySelector('input.row-check');
-  checkbox.addEventListener('change', () => {
-    if (checkbox.checked) state.selectedIds.add(productId);
-    else state.selectedIds.delete(productId);
-    syncSelectionUI(filteredProducts());
-  });
+  if (checkbox) {
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) state.selectedIds.add(productId);
+      else state.selectedIds.delete(productId);
+      syncSelectionUI(filteredProducts());
+    });
+  }
   row.querySelector('[data-action="enter-edit"]').addEventListener('click', () => setRowEditing(row, true));
   row.querySelector('[data-action="cancel-edit"]').addEventListener('click', () => {
     setRowEditing(row, false);
@@ -216,10 +239,14 @@ function setRowEditing(row, editing) {
 
 async function saveRow(row, productId) {
   row.classList.add('saving');
-  const body = {};
-  row.querySelectorAll('input.cell-edit').forEach((input) => {
+  const body = {billing_modes: []};
+  row.querySelectorAll('input.cell-edit, .billing-mode-edit input').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
+    if (field === 'billing_modes') {
+      if (input.checked) body.billing_modes.push(input.dataset.mode);
+      return;
+    }
     if (input.type === 'checkbox') {
       // UI 复选框语义：勾 = 支持返佣；DB 字段是 no_commission（true = 不支持），需翻转
       body[field] = field === 'no_commission' ? !input.checked : input.checked;
@@ -227,6 +254,11 @@ async function saveRow(row, productId) {
       body[field] = input.value;
     }
   });
+  if (!body.billing_modes.length) {
+    row.classList.remove('saving');
+    alert('计费方式至少选一个');
+    return;
+  }
   const resp = await fetchJson(`/api/products/${productId}/rule`, {
     method: 'PUT',
     body: JSON.stringify(body),
@@ -254,6 +286,12 @@ async function deleteProduct(productId) {
 }
 
 async function batchDelete() {
+  if (!state.batchDeleteMode) {
+    state.batchDeleteMode = true;
+    state.selectedIds.clear();
+    renderProducts();
+    return;
+  }
   const ids = [...state.selectedIds];
   if (!ids.length) return;
   if (!confirm(`确认批量删除 ${ids.length} 个产品？\n相关报价规则、变更历史、行业匹配会一起清掉，无法恢复。`)) return;
@@ -263,10 +301,17 @@ async function batchDelete() {
   });
   if (resp.code === 0) {
     state.selectedIds.clear();
+    state.batchDeleteMode = false;
     await refreshProducts();
   } else {
     alert(resp.msg || '批量删除失败');
   }
+}
+
+function cancelBatchDelete() {
+  state.batchDeleteMode = false;
+  state.selectedIds.clear();
+  renderProducts();
 }
 
 async function refreshProducts() {
@@ -338,6 +383,7 @@ document.getElementById('changeLogBtn')?.addEventListener('click', () => {
 });
 
 document.getElementById('selectAll')?.addEventListener('change', (e) => {
+  if (!state.batchDeleteMode) return;
   const list = filteredProducts();
   if (e.target.checked) list.forEach((p) => state.selectedIds.add(p.id));
   else list.forEach((p) => state.selectedIds.delete(p.id));
@@ -345,6 +391,7 @@ document.getElementById('selectAll')?.addEventListener('change', (e) => {
 });
 
 document.getElementById('batchDeleteBtn')?.addEventListener('click', batchDelete);
+document.getElementById('batchCancelBtn')?.addEventListener('click', cancelBatchDelete);
 
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({

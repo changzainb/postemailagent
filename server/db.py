@@ -29,6 +29,11 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(pricing_rules)").fetchall()}
+        if "billing_modes" not in columns:
+            conn.execute(
+                "ALTER TABLE pricing_rules ADD COLUMN billing_modes TEXT DEFAULT '[\"prepaid\",\"postpaid\"]'"
+            )
         conn.commit()
     finally:
         conn.close()

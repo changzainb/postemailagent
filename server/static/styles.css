@@ -351,7 +351,7 @@ textarea[readonly] {
 .product-header,
 .product-row {
   display: grid;
-  grid-template-columns: 44px minmax(260px, 1fr) 112px 92px 112px 32px;
+  grid-template-columns: 44px minmax(240px, 1fr) 92px 112px 92px 112px 32px;
   gap: 6px;
   align-items: center;
 }
@@ -544,8 +544,8 @@ textarea[readonly] {
   }
 
   .product-row {
-    grid-template-columns: 44px minmax(240px, 1fr) 112px 92px 112px 32px;
-    min-width: 700px;
+    grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 112px 32px;
+    min-width: 800px;
   }
 
   .product-index,

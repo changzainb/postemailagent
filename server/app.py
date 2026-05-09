@@ -98,7 +98,8 @@ def create_app():
             "SELECT p.id, p.scenario_id, s.label AS scenario_label, p.name, p.aliases, "
             "p.status, p.source, p.updated_at, "
             "r.normal_discount, r.normal_commission, r.breakthrough_discount, "
-            "r.breakthrough_commission, r.no_commission, r.remark, r.updated_by, r.updated_at AS rule_updated_at "
+            "r.breakthrough_commission, r.billing_modes, r.no_commission, r.remark, "
+            "r.updated_by, r.updated_at AS rule_updated_at "
             "FROM products p "
             "LEFT JOIN scenarios s ON s.id = p.scenario_id "
             "LEFT JOIN pricing_rules r ON r.product_id = p.id "
@@ -120,6 +121,7 @@ def create_app():
         for row in rows:
             item = dict(row)
             item["aliases"] = json.loads(item.get("aliases") or "[]")
+            item["billing_modes"] = json.loads(item.get("billing_modes") or '["prepaid","postpaid"]')
             data.append(item)
         return jsonify({"code": 0, "data": data})
 
@@ -207,13 +209,14 @@ def create_app():
             "normal_commission": (body.get("normal_commission") or "").strip(),
             "breakthrough_discount": (body.get("breakthrough_discount") or "").strip(),
             "breakthrough_commission": (body.get("breakthrough_commission") or "").strip(),
+            "billing_modes": json.dumps(_normalize_billing_modes(body.get("billing_modes")), ensure_ascii=False),
             "no_commission": 1 if body.get("no_commission") else 0,
             "remark": (body.get("remark") or "").strip(),
             "updated_by": user.get("username", ""),
         }
         # 计算 diff（只看业务字段，updated_by/at 不算）
         diff_keys = ["normal_discount", "normal_commission", "breakthrough_discount",
-                     "breakthrough_commission", "no_commission", "remark"]
+                 "breakthrough_commission", "billing_modes", "no_commission", "remark"]
         old_dict = dict(old) if old else {}
         diff = {}
         for k in diff_keys:
@@ -235,29 +238,36 @@ def create_app():
         if old:
             db.execute(
                 "UPDATE pricing_rules SET normal_discount=?, normal_commission=?, "
-                "breakthrough_discount=?, breakthrough_commission=?, no_commission=?, "
+                "breakthrough_discount=?, breakthrough_commission=?, billing_modes=?, no_commission=?, "
                 "remark=?, updated_by=?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?",
                 (
                     fields["normal_discount"], fields["normal_commission"],
                     fields["breakthrough_discount"], fields["breakthrough_commission"],
-                    fields["no_commission"], fields["remark"], fields["updated_by"], product_id,
+                    fields["billing_modes"], fields["no_commission"], fields["remark"], fields["updated_by"], product_id,
                 ),
             )
         else:
             db.execute(
                 "INSERT INTO pricing_rules(product_id, normal_discount, normal_commission, "
-                "breakthrough_discount, breakthrough_commission, no_commission, remark, updated_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "breakthrough_discount, breakthrough_commission, billing_modes, no_commission, remark, updated_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     product_id, fields["normal_discount"], fields["normal_commission"],
                     fields["breakthrough_discount"], fields["breakthrough_commission"],
-                    fields["no_commission"], fields["remark"], fields["updated_by"],
+                    fields["billing_modes"], fields["no_commission"], fields["remark"], fields["updated_by"],
                 ),
             )
         db.commit()
         return jsonify({"code": 0, "data": {"changed": bool(diff or not old), "diff": diff}})
 
     # ------- Match -------
+    def _normalize_billing_modes(value):
+        allowed = {"prepaid", "postpaid"}
+        if isinstance(value, str):
+            value = [value]
+        modes = [x for x in (value or []) if x in allowed]
+        return modes or ["prepaid", "postpaid"]
+
     @app.post("/api/match")
     def api_match():
         body = request.get_json(silent=True) or {}
@@ -268,7 +278,7 @@ def create_app():
             "SELECT p.id, p.name, p.name_normalized, p.aliases, p.scenario_id, "
             "s.label AS scenario_label, "
             "r.normal_discount, r.normal_commission, r.breakthrough_discount, "
-            "r.breakthrough_commission, r.no_commission, r.remark "
+            "r.breakthrough_commission, r.billing_modes, r.no_commission, r.remark "
             "FROM products p "
             "LEFT JOIN scenarios s ON s.id = p.scenario_id "
             "LEFT JOIN pricing_rules r ON r.product_id = p.id "
@@ -278,6 +288,7 @@ def create_app():
         for row in rows:
             item = dict(row)
             item["aliases"] = json.loads(item.get("aliases") or "[]")
+            item["billing_modes"] = json.loads(item.get("billing_modes") or '["prepaid","postpaid"]')
             catalog.append(item)
 
         results = []

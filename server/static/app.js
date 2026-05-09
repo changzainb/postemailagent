@@ -222,9 +222,30 @@ function parseCommissionPercent(value) {
   return match ? Number(match[1]) : null;
 }
 
+function normalizeBillingModes(modes) {
+  const list = Array.isArray(modes) ? modes : ["prepaid", "postpaid"];
+  const allowed = list.filter((x) => x === "prepaid" || x === "postpaid");
+  return allowed.length ? allowed : ["prepaid", "postpaid"];
+}
+
+function billingModeLabel(mode) {
+  return mode === "postpaid" ? "后付费" : "预付费";
+}
+
+function setupBillingModeSelect(row, modes, preferred) {
+  const select = row.querySelector(".product-billing-mode");
+  const available = normalizeBillingModes(modes);
+  const value = available.includes(preferred) ? preferred : available[0];
+  select.innerHTML = available.map((mode) => `<option value="${mode}">${billingModeLabel(mode)}</option>`).join("");
+  select.value = value;
+  select.disabled = available.length === 1;
+  row.dataset.billingModes = JSON.stringify(available);
+}
+
 function getProducts() {
   return Array.from(productList.querySelectorAll(".product-row")).map((row) => ({
     name: row.querySelector(".product-name").value.trim(),
+    billingMode: row.querySelector(".product-billing-mode").value,
     priceMode: row.querySelector(".product-price-mode").value,
     discount: row.querySelector(".product-discount").value.trim(),
     commission: normalizeCommission(row.querySelector(".product-commission").value),
@@ -267,6 +288,7 @@ function applyMatchedRule(row, matched) {
     row.dataset.normalCommission = "";
     row.dataset.breakthroughDiscount = "";
     row.dataset.breakthroughCommission = "";
+    setupBillingModeSelect(row, ["prepaid", "postpaid"], row.querySelector(".product-billing-mode").value);
     row.dataset.noCommission = "0";
     row.classList.add("unmatched");
     setMatchTag(row, "未匹配商务库", "warn");
@@ -278,6 +300,7 @@ function applyMatchedRule(row, matched) {
   row.dataset.normalCommission = matched.normal_commission || "";
   row.dataset.breakthroughDiscount = matched.breakthrough_discount || "";
   row.dataset.breakthroughCommission = matched.breakthrough_commission || "";
+  setupBillingModeSelect(row, matched.billing_modes, row.querySelector(".product-billing-mode").value);
   row.dataset.noCommission = matched.no_commission ? "1" : "0";
   row.classList.remove("unmatched");
   const conf = matched.confidence ? ` · ${(matched.confidence * 100).toFixed(0)}%` : "";
@@ -447,7 +470,8 @@ function generateEmail() {
   const productLines = products.map((product, index) => {
     const discount = product.discount || "待填写折扣";
     const commission = product.commission || "待填写返佣";
-    return `【申请产品${index + 1}】：产品名称/折扣/返佣：${product.name || "待填写产品名称"}：${discount}/${commission}`;
+    const billing = billingModeLabel(product.billingMode);
+    return `【申请产品${index + 1}】：产品名称/计费方式/折扣/返佣：${product.name || "待填写产品名称"}：${billing}/${discount}/${commission}`;
   });
 
   // 复制按钮根据缺失情况禁用
@@ -492,6 +516,7 @@ function addProduct(product = {}) {
   row.dataset.normalCommission = product.normal_commission || "";
   row.dataset.breakthroughDiscount = product.breakthrough_discount || "";
   row.dataset.breakthroughCommission = product.breakthrough_commission || "";
+  setupBillingModeSelect(row, product.billing_modes, product.billingMode || "prepaid");
   row.dataset.noCommission = product.no_commission ? "1" : "0";
   row.dataset.matched = product.id ? "1" : "0";
   if (product.id) row.dataset.productId = product.id;
@@ -514,6 +539,7 @@ function addProduct(product = {}) {
     applyModeToRow(row, event.target.value);
     generateEmail();
   });
+  row.querySelector(".product-billing-mode").addEventListener("change", generateEmail);
   row.querySelector(".product-discount").addEventListener("input", () => {
     row.querySelector(".product-price-mode").value = "manual";
     generateEmail();

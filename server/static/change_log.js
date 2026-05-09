@@ -6,6 +6,7 @@
     normal_commission: "常规返佣",
     breakthrough_discount: "突破折扣",
     breakthrough_commission: "突破返佣",
+    billing_modes: "计费方式",
     no_commission: "返佣支持",
     remark: "说明",
   };
@@ -15,9 +16,19 @@
     }[c]));
   }
   function fmtVal(field, v) {
+    if (field === "billing_modes") return formatBillingModes(v);
     if (field === "no_commission") return Number(v) ? "不支持" : "支持";
     if (v === null || v === undefined || v === "") return "—";
     return v;
+  }
+  function formatBillingModes(v) {
+    const map = { prepaid: "预付费", postpaid: "后付费" };
+    let list = v;
+    if (typeof list === "string") {
+      try { list = JSON.parse(list); } catch (_) { list = list ? [list] : []; }
+    }
+    if (!Array.isArray(list) || !list.length) return "—";
+    return list.map((x) => map[x] || x).join(" / ");
   }
   function fmtTime(s) { return (s || "").replace("T", " ").slice(0, 16); }
 

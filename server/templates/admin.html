@@ -37,13 +37,15 @@
       <div class="toolbar">
         <input id="searchInput" placeholder="搜索产品名">
         <span class="muted" id="countText"></span>
-        <button class="ghost danger" id="batchDeleteBtn" disabled>批量删除</button>
+        <button class="ghost danger" id="batchDeleteBtn">批量删除</button>
+        <button class="ghost" id="batchCancelBtn" hidden>取消</button>
       </div>
       <div class="rule-table-wrap">
         <table class="rule-table">
           <colgroup>
             <col style="width:36px">
             <col style="width:auto">
+            <col style="width:110px">
             <col style="width:78px">
             <col style="width:96px">
             <col style="width:78px">
@@ -57,6 +59,7 @@
             <tr>
               <th class="col-check"><input type="checkbox" id="selectAll" title="全选当前列表"></th>
               <th class="col-name">产品名称</th>
+              <th>计费方式</th>
               <th>常规折扣</th>
               <th>常规返佣</th>
               <th>突破折扣</th>
