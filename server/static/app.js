@@ -130,26 +130,32 @@ const catalog = {
   scenarioById: {},
   products: [],
   productsByScenarioId: new Map(),
+  productById: new Map(),
+  industryProducts: {}, // { industryKey: [productId, ...] }
 };
 let activeScenarioKey = null;
 
 async function loadCatalog() {
   try {
-    const [scResp, prResp] = await Promise.all([
+    const [scResp, prResp, ipResp] = await Promise.all([
       fetch("/api/scenarios").then((r) => r.json()),
       fetch("/api/products?status=active").then((r) => r.json()),
+      fetch("/api/industry-products").then((r) => r.json()),
     ]);
     catalog.scenarios = scResp.data || [];
     catalog.products = prResp.data || [];
+    catalog.industryProducts = ipResp.data || {};
     catalog.scenarioByKey = {};
     catalog.scenarioById = {};
     catalog.productsByScenarioId = new Map();
+    catalog.productById = new Map();
     catalog.scenarios.forEach((s) => {
       catalog.scenarioByKey[s.key] = s;
       catalog.scenarioById[s.id] = s;
       catalog.productsByScenarioId.set(s.id, []);
     });
     catalog.products.forEach((p) => {
+      catalog.productById.set(p.id, p);
       const list = catalog.productsByScenarioId.get(p.scenario_id) || [];
       list.push(p);
       catalog.productsByScenarioId.set(p.scenario_id, list);
@@ -366,10 +372,14 @@ function findScenarioKey() {
 }
 
 function findScenarioBundle() {
-  const industry = industryInput.value.trim().toLowerCase();
+  const industry = industryInput.value.trim();
   if (!industry) return [];
+  // 后台已配置过该行业 → 用特殊 marker，让 applyScenario/resetProducts 走自定义路径
+  const customIds = catalog.industryProducts[industry];
+  if (customIds && customIds.length) return ["__custom__"];
+  const lower = industry.toLowerCase();
   for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
-    if (pattern.toLowerCase().split("|").some((t) => industry.includes(t))) return keys;
+    if (pattern.toLowerCase().split("|").some((t) => lower.includes(t))) return keys;
   }
   const wide = `${industryInput.value} ${fields.customerName.value}`.toLowerCase();
   for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
@@ -530,6 +540,19 @@ const SCENARIO_ALIAS = {
 function resetProducts() {
   productList.innerHTML = "";
   if (!activeScenarioKey) return;
+  // 优先用后台配的 industry → product id 列表
+  const industry = industryInput.value.trim();
+  const customIds = catalog.industryProducts[industry];
+  if (customIds && customIds.length) {
+    const seen = new Set();
+    customIds.forEach((pid) => {
+      const p = catalog.productById.get(pid);
+      if (!p || seen.has(p.id)) return;
+      seen.add(p.id);
+      addProduct(p);
+    });
+    return;
+  }
   const keys = Array.isArray(activeScenarioKey) ? activeScenarioKey : [activeScenarioKey];
   const seen = new Set();
   keys.forEach((key) => {
@@ -558,8 +581,14 @@ function applyScenario(scenarioKey = activeScenarioKey) {
     return;
   }
   const keys = Array.isArray(scenarioKey) ? scenarioKey : [scenarioKey];
-  const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
-  matchStatus.textContent = labels.length ? `已匹配场景：${[...new Set(labels)].join(" + ")}` : "";
+  if (keys.includes("__custom__")) {
+    const industry = industryInput.value.trim();
+    const ids = catalog.industryProducts[industry] || [];
+    matchStatus.textContent = `按后台配置：${industry} → ${ids.length} 个产品`;
+  } else {
+    const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
+    matchStatus.textContent = labels.length ? `已匹配场景：${[...new Set(labels)].join(" + ")}` : "";
+  }
   resetProducts();
 }
 
@@ -575,8 +604,14 @@ function suggestScenario() {
   const current = Array.isArray(activeScenarioKey) ? activeScenarioKey : (activeScenarioKey ? [activeScenarioKey] : []);
   if (keys.length === current.length && keys.every((k, i) => k === current[i])) return;
   // 不同 → 提示，但不覆盖
-  const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
-  matchStatus.textContent = `行业已变 → 建议场景：${[...new Set(labels)].join(" + ")}（点"按行业重排产品"会重置当前列表）`;
+  if (keys.includes("__custom__")) {
+    const industry = industryInput.value.trim();
+    const n = (catalog.industryProducts[industry] || []).length;
+    matchStatus.textContent = `行业已变 → 后台已配 ${n} 个产品（点"按行业重排产品"会重置当前列表）`;
+  } else {
+    const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
+    matchStatus.textContent = `行业已变 → 建议场景：${[...new Set(labels)].join(" + ")}（点"按行业重排产品"会重置当前列表）`;
+  }
 }
 
 function matchProducts() {

@@ -57,3 +57,15 @@ CREATE TABLE IF NOT EXISTS users (
   role          TEXT NOT NULL DEFAULT 'business',
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 行业 → 产品 自定义映射（后台手动维护，前端按行业出产品列表）
+CREATE TABLE IF NOT EXISTS industry_products (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  industry_key  TEXT NOT NULL,
+  product_id    INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  sort_order    INTEGER DEFAULT 0,
+  updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(industry_key, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_indprod_key ON industry_products(industry_key);
+

@@ -32,6 +32,12 @@ def create_app():
             return redirect(url_for("page_login"))
         return render_template("admin.html")
 
+    @app.get("/admin/industries")
+    def page_admin_industries():
+        if not current_user():
+            return redirect(url_for("page_login"))
+        return render_template("admin_industries.html")
+
     @app.get("/login")
     def page_login():
         return render_template("login.html")
@@ -264,6 +270,81 @@ def create_app():
             "WHERE resolved=0 ORDER BY reported_at DESC LIMIT 200"
         ).fetchall()
         return jsonify({"code": 0, "data": [dict(row) for row in rows]})
+
+    # ------- Industry → Products mapping -------
+    INDUSTRY_LIST = [
+        "漫剧 / 短剧 / AIGC 内容制作",
+        "漫画 / 动漫 / 二次元",
+        "直播 / 语音房 / 社交",
+        "游戏 / 互娱",
+        "短视频 / 图文社区",
+        "文化传媒 / MCN / 营销",
+        "媒资处理 / 视频审核",
+        "出海业务 / 海外内容",
+        "会议 / IM / 协作",
+        "物联网 / 智能硬件",
+        "物流 / 交通运输",
+        "教育 / 校园安防",
+        "医疗 / 健康",
+        "电商 / 零售 / SaaS",
+        "政企信息化 / 软件开发",
+        "金融 / 人脸核身",
+        "企业内部 IT / 网盘 / OA",
+    ]
+
+    @app.get("/api/industries")
+    def api_industries():
+        # 同时返回每个行业已配置的产品数，方便后台显示
+        db = get_db()
+        rows = db.execute(
+            "SELECT industry_key, COUNT(*) AS cnt FROM industry_products GROUP BY industry_key"
+        ).fetchall()
+        counts = {r["industry_key"]: r["cnt"] for r in rows}
+        data = [{"key": name, "label": name, "count": counts.get(name, 0)} for name in INDUSTRY_LIST]
+        return jsonify({"code": 0, "data": data})
+
+    @app.get("/api/industry-products")
+    def api_industry_products_all():
+        """前端启动时拉一次：返回 {industry_key: [product_id, ...]} 完整映射"""
+        rows = get_db().execute(
+            "SELECT industry_key, product_id FROM industry_products ORDER BY industry_key, sort_order, id"
+        ).fetchall()
+        result = {}
+        for r in rows:
+            result.setdefault(r["industry_key"], []).append(r["product_id"])
+        return jsonify({"code": 0, "data": result})
+
+    @app.get("/api/industries/<path:industry_key>/products")
+    @require_role("business", "admin")
+    def api_industry_products_one(industry_key):
+        rows = get_db().execute(
+            "SELECT product_id FROM industry_products WHERE industry_key=? ORDER BY sort_order, id",
+            (industry_key,),
+        ).fetchall()
+        return jsonify({"code": 0, "data": [r["product_id"] for r in rows]})
+
+    @app.put("/api/industries/<path:industry_key>/products")
+    @require_role("admin")
+    def api_industry_products_save(industry_key):
+        body = request.get_json(silent=True) or {}
+        ids = body.get("product_ids") or []
+        if not isinstance(ids, list):
+            return jsonify({"code": 400, "msg": "product_ids 必须是数组"}), 400
+        if industry_key not in INDUSTRY_LIST:
+            return jsonify({"code": 400, "msg": "未知行业"}), 400
+        db = get_db()
+        try:
+            db.execute("DELETE FROM industry_products WHERE industry_key=?", (industry_key,))
+            for idx, pid in enumerate(ids):
+                db.execute(
+                    "INSERT INTO industry_products(industry_key, product_id, sort_order) VALUES (?, ?, ?)",
+                    (industry_key, int(pid), idx),
+                )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            return jsonify({"code": 500, "msg": f"保存失败：{exc}"}), 500
+        return jsonify({"code": 0, "data": {"saved": len(ids)}})
 
     return app
 

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行业 → 产品 匹配</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+  <style>
+    .ind-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 24px; align-items: start; }
+    .ind-side { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; max-height: calc(100vh - 130px); overflow-y: auto; }
+    .ind-side ul { list-style: none; margin: 0; padding: 0; }
+    .ind-side li { display: flex; justify-content: space-between; align-items: center; padding: 9px 11px; border-radius: 7px; cursor: pointer; font-size: 13px; color: #1f2937; }
+    .ind-side li:hover { background: #f3f4f6; }
+    .ind-side li.active { background: #1f2937; color: #fff; }
+    .ind-side li .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e5e7eb; color: #374151; min-width: 18px; text-align: center; }
+    .ind-side li.active .badge { background: rgba(255,255,255,0.2); color: #fff; }
+    .ind-side li .badge.zero { background: transparent; color: #9ca3af; }
+
+    .ind-main { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 18px; max-height: calc(100vh - 130px); overflow-y: auto; }
+    .ind-main h2 { margin: 0 0 4px; font-size: 16px; }
+    .ind-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; margin-bottom: 12px; position: sticky; top: -14px; padding-top: 14px; background: #fff; z-index: 5; }
+    .ind-toolbar input { height: 30px; padding: 0 9px; border: 1px solid #e5e7eb; border-radius: 6px; width: 220px; font-size: 13px; }
+    .ind-toolbar .actions { display: flex; gap: 8px; align-items: center; }
+    .selected-count { font-size: 12px; color: #6b7280; }
+    .selected-count strong { color: #111827; font-size: 14px; }
+    .scenario-group { margin-bottom: 14px; }
+    .scenario-group h3 { font-size: 13px; color: #475569; margin: 0 0 6px; padding: 4px 0; border-bottom: 1px dashed #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .scenario-group h3 .group-actions { font-size: 11px; color: #2563eb; cursor: pointer; user-select: none; }
+    .scenario-group h3 .group-actions:hover { text-decoration: underline; }
+    .product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
+    .product-grid label { display: flex; gap: 7px; align-items: center; padding: 5px 7px; border-radius: 5px; font-size: 12.5px; color: #1f2937; cursor: pointer; line-height: 1.3; }
+    .product-grid label:hover { background: #f8fafc; }
+    .product-grid label input { margin: 0; }
+    .product-grid label.checked { background: #eef2ff; color: #1e3a8a; }
+    .product-grid label.hidden { display: none; }
+    .save-btn { background: #111827; color: #fff; border: none; padding: 7px 16px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+    .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .save-btn:hover:not(:disabled) { background: #000; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1>行业 → 产品 匹配</h1>
+      <span class="muted">勾选保存后，前端选这个行业会自动出这批产品</span>
+    </div>
+    <div class="topbar-right">
+      <a class="ghost" href="/admin">规则后台</a>
+      <a class="ghost" href="/">销售生成器</a>
+      <button class="ghost" id="logoutBtn">退出</button>
+    </div>
+  </header>
+
+  <main class="ind-shell">
+    <aside class="ind-side">
+      <ul id="industryList"></ul>
+    </aside>
+
+    <section class="ind-main">
+      <div class="ind-toolbar">
+        <div>
+          <h2 id="curIndustryName">选择左侧行业</h2>
+          <span class="selected-count">已选 <strong id="selCount">0</strong> 个产品</span>
+        </div>
+        <div class="actions">
+          <input id="filterInput" placeholder="搜产品名">
+          <button class="save-btn" id="saveBtn" disabled>保存</button>
+        </div>
+      </div>
+      <div id="productPanel">
+        <p style="color:#9ca3af;font-size:13px;text-align:center;padding:60px 0;">← 先选个行业</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = {
+      industries: [],
+      currentKey: null,
+      products: [],
+      scenarios: [],
+      selected: new Set(),
+      dirty: false,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const toast = (msg) => {
+      const t = $("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1800);
+    };
+
+    async function loadAll() {
+      const [me, ind, sc, pr] = await Promise.all([
+        fetch("/api/auth/me").then((r) => r.json()),
+        fetch("/api/industries").then((r) => r.json()),
+        fetch("/api/scenarios").then((r) => r.json()),
+        fetch("/api/products?status=active").then((r) => r.json()),
+      ]);
+      if (!me.data) { location.href = "/login"; return; }
+      state.industries = ind.data || [];
+      state.scenarios = sc.data || [];
+      state.products = pr.data || [];
+      renderIndustryList();
+      if (state.industries[0]) selectIndustry(state.industries[0].key);
+    }
+
+    function renderIndustryList() {
+      const ul = $("industryList");
+      ul.innerHTML = state.industries.map((i) => `
+        <li data-key="${i.key}" class="${i.key === state.currentKey ? "active" : ""}">
+          <span>${i.label}</span>
+          <span class="badge ${i.count === 0 ? "zero" : ""}">${i.count}</span>
+        </li>
+      `).join("");
+      ul.querySelectorAll("li").forEach((li) => {
+        li.addEventListener("click", () => {
+          if (state.dirty && !confirm("当前修改未保存，要切换吗？")) return;
+          selectIndustry(li.dataset.key);
+        });
+      });
+    }
+
+    async function selectIndustry(key) {
+      state.currentKey = key;
+      state.dirty = false;
+      $("saveBtn").disabled = true;
+      $("curIndustryName").textContent = key;
+      renderIndustryList();
+      const resp = await fetch(`/api/industries/${encodeURIComponent(key)}/products`).then((r) => r.json());
+      state.selected = new Set(resp.data || []);
+      renderProductPanel();
+      updateCount();
+    }
+
+    function renderProductPanel() {
+      const panel = $("productPanel");
+      const byScenario = new Map();
+      state.scenarios.forEach((s) => byScenario.set(s.id, { label: s.label, items: [] }));
+      state.products.forEach((p) => {
+        const g = byScenario.get(p.scenario_id);
+        if (g) g.items.push(p);
+      });
+      panel.innerHTML = "";
+      byScenario.forEach((g, sid) => {
+        if (!g.items.length) return;
+        const div = document.createElement("div");
+        div.className = "scenario-group";
+        div.innerHTML = `
+          <h3>
+            <span>${g.label}（${g.items.length}）</span>
+            <span class="group-actions" data-sid="${sid}">全选 / 反选</span>
+          </h3>
+          <div class="product-grid">
+            ${g.items.map((p) => `
+              <label class="${state.selected.has(p.id) ? "checked" : ""}" data-name="${p.name.toLowerCase()}">
+                <input type="checkbox" data-pid="${p.id}" ${state.selected.has(p.id) ? "checked" : ""}>
+                <span>${p.name}</span>
+              </label>
+            `).join("")}
+          </div>
+        `;
+        panel.appendChild(div);
+      });
+      panel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.addEventListener("change", () => {
+          const pid = parseInt(cb.dataset.pid, 10);
+          if (cb.checked) state.selected.add(pid); else state.selected.delete(pid);
+          cb.closest("label").classList.toggle("checked", cb.checked);
+          markDirty();
+          updateCount();
+        });
+      });
+      panel.querySelectorAll(".group-actions").forEach((sp) => {
+        sp.addEventListener("click", () => {
+          const sid = parseInt(sp.dataset.sid, 10);
+          const items = (byScenario.get(sid) || { items: [] }).items;
+          const allOn = items.every((p) => state.selected.has(p.id));
+          items.forEach((p) => { if (allOn) state.selected.delete(p.id); else state.selected.add(p.id); });
+          renderProductPanel();
+          markDirty();
+          updateCount();
+        });
+      });
+      applyFilter();
+    }
+
+    function applyFilter() {
+      const q = ($("filterInput").value || "").trim().toLowerCase();
+      document.querySelectorAll(".product-grid label").forEach((l) => {
+        l.classList.toggle("hidden", q && !l.dataset.name.includes(q));
+      });
+    }
+
+    function updateCount() { $("selCount").textContent = state.selected.size; }
+    function markDirty() { state.dirty = true; $("saveBtn").disabled = false; }
+
+    $("filterInput").addEventListener("input", applyFilter);
+    $("saveBtn").addEventListener("click", async () => {
+      const ids = [...state.selected];
+      const resp = await fetch(`/api/industries/${encodeURIComponent(state.currentKey)}/products`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_ids: ids }),
+      }).then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
+      if (resp.code !== 0) { toast(resp.msg || "保存失败（需要 admin 权限）"); return; }
+      state.dirty = false;
+      $("saveBtn").disabled = true;
+      // 刷新左侧 count
+      const ind = await fetch("/api/industries").then((r) => r.json());
+      state.industries = ind.data || [];
+      renderIndustryList();
+      toast(`已保存 ${ids.length} 个产品`);
+    });
+
+    $("logoutBtn").addEventListener("click", async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      location.href = "/login";
+    });
+
+    loadAll();
+  </script>
+</body>
+</html>
