@@ -8,6 +8,35 @@ const SCENARIO_KEYWORDS = {
   mq: ["消息队列", "CKafka", "RocketMQ", "TDMQ", "Kafka", "Pulsar"],
 };
 
+// 每个场景只默认加载这些关键词命中的产品，避免一口气列 32 个
+const SCENARIO_PRESET_TOKENS = {
+  aigc_media: ["云点播-流量计费", "云点播-标准存储", "云点播-AIGC-生图模型-Kling", "云点播-AIGC-生视频模型-Hunyuan", "云点播-AIGC-生视频模型-kling"],
+  trtc_live: ["高清视频月结", "高清视频日结", "标清视频月结", "语音月结", "混流转码"],
+  edge_cdn: ["边缘加速平台EO-企业版", "边缘加速平台EO-基础服务资费套餐（超额流量）-中国境内-后付费", "边缘加速平台EO-基础服务资费套餐（超额安全请求次数）-中国境内-后付费"],
+  cvm_db: ["云服务器cvm-标准型S4\u3001S5\u3001S6\u3001S8\u3001SA2\u3001SA3\u3001SA4\u3001SA5"],
+  cos: ["对象存储 COS-标准存储\u3001流量-后付费"],
+  security: ["天御-视频审核", "天御-文本审核", "天御-音频内容安全", "人脸核身"],
+  mq: ["CKafka", "RocketMQ"],
+};
+
+// 行业关键词 → 需要叠加的场景（一个行业常同时需要几类产品）
+const INDUSTRY_SCENARIO_BUNDLES = {
+  "漫剧|短剧|aigc|内容制作|影视": ["aigc_media", "cos", "edge_cdn"],
+  "漫画|动漫|二次元": ["aigc_media", "cos", "edge_cdn"],
+  "直播|语音房|社交|连麦|K歌": ["trtc_live", "security", "cos"],
+  "游戏|互娱": ["cvm_db", "trtc_live", "cos", "edge_cdn"],
+  "短视频|图文|MCN|营销": ["cos", "edge_cdn", "aigc_media"],
+  "出海|海外": ["edge_cdn", "cvm_db", "cos"],
+  "物联网|智能硬件": ["cvm_db", "mq", "cos"],
+  "物流|交通运输": ["cvm_db", "mq", "cos"],
+  "教育|校园": ["trtc_live", "cos", "security"],
+  "医疗|健康": ["cvm_db", "cos", "security"],
+  "电商|零售|SaaS": ["cvm_db", "cos", "edge_cdn"],
+  "政企|信息化|软件开发": ["cvm_db", "cos"],
+  "金融|人脸核身": ["security", "cvm_db"],
+  "企业|网盘|OA": ["cvm_db", "cos"],
+};
+
 const fixedApplicationInfo = {
   managerTitle: "腾讯云渠道经理",
   agentName: "广州西骋网络科技有限公司",
@@ -290,6 +319,19 @@ function findScenarioKey() {
   return null;
 }
 
+function findScenarioBundle() {
+  const industry = industryInput.value.toLowerCase();
+  for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
+    if (pattern.toLowerCase().split("|").some((t) => industry.includes(t))) return keys;
+  }
+  const wide = `${industryInput.value} ${fields.customerName.value} ${fields.currentProject.value}`.toLowerCase();
+  for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
+    if (pattern.toLowerCase().split("|").some((t) => wide.includes(t))) return keys;
+  }
+  const single = findScenarioKey();
+  return single ? [single] : [];
+}
+
 function normalizeSentence(text) {
   return (text || "").trim().replace(/[，,。；;\s]+$/, "");
 }
@@ -415,32 +457,45 @@ function addProduct(product = {}) {
 function resetProducts() {
   productList.innerHTML = "";
   if (!activeScenarioKey) return;
-  const scenario = catalog.scenarioByKey[activeScenarioKey];
-  if (!scenario) return;
-  const products = catalog.productsByScenarioId.get(scenario.id) || [];
-  products.forEach((p) => addProduct(p));
+  const keys = Array.isArray(activeScenarioKey) ? activeScenarioKey : [activeScenarioKey];
+  const seen = new Set();
+  keys.forEach((key) => {
+    const scenario = catalog.scenarioByKey[key];
+    if (!scenario) return;
+    const tokens = SCENARIO_PRESET_TOKENS[key] || [];
+    const all = catalog.productsByScenarioId.get(scenario.id) || [];
+    const filtered = tokens.length
+      ? all.filter((p) => tokens.some((t) => p.name.includes(t)))
+      : all.slice(0, 5);
+    filtered.forEach((p) => {
+      if (seen.has(p.id)) return;
+      seen.add(p.id);
+      addProduct(p);
+    });
+  });
 }
 
 function applyScenario(scenarioKey = activeScenarioKey) {
   activeScenarioKey = scenarioKey;
-  if (!scenarioKey) {
-    matchStatus.textContent = "暂未匹配到经验场景，可手动新增产品。";
+  if (!scenarioKey || (Array.isArray(scenarioKey) && scenarioKey.length === 0)) {
+    matchStatus.textContent = "暂未匹配到场景，可手动新增产品。";
     productList.innerHTML = "";
     generateEmail();
     return;
   }
-  const scenario = catalog.scenarioByKey[scenarioKey];
-  matchStatus.textContent = scenario ? `已匹配场景：${scenario.label}` : "";
+  const keys = Array.isArray(scenarioKey) ? scenarioKey : [scenarioKey];
+  const labels = keys.map((k) => catalog.scenarioByKey[k]?.label).filter(Boolean);
+  matchStatus.textContent = labels.length ? `已匹配场景：${labels.join(" + ")}` : "";
   resetProducts();
 }
 
 function matchProducts() {
-  const key = findScenarioKey();
-  if (!key) {
-    matchStatus.textContent = "暂未匹配到经验场景，可手动新增产品。";
+  const keys = findScenarioBundle();
+  if (!keys.length) {
+    matchStatus.textContent = "暂未匹配到场景，可手动新增产品。";
     return;
   }
-  applyScenario(key);
+  applyScenario(keys);
 }
 
 async function copyText(text, label) {
