@@ -156,25 +156,25 @@
 
     async function addIndustry() {
       const name = ($("newIndInput").value || "").trim();
-      if (!name) return;
+      if (!name) { $("newIndInput").focus(); return; }
       const resp = await fetch("/api/industries", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       }).then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
-      if (resp.code !== 0) { toast(resp.msg || "新增失败"); return; }
+      if (resp.code !== 0) { alert(resp.msg || "新增失败"); return; }
       $("newIndInput").value = "";
       await refreshIndustryList();
-      toast("已新增");
+      toast("已新增「" + name + "」");
     }
 
     async function renameIndustry(id, oldName) {
       const name = prompt("重命名行业", oldName);
-      if (!name || name === oldName) return;
+      if (!name || name.trim() === oldName) return;
       const resp = await fetch(`/api/industries/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
       }).then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
-      if (resp.code !== 0) { toast(resp.msg || "改名失败"); return; }
+      if (resp.code !== 0) { alert(resp.msg || "改名失败"); return; }
       if (state.currentKey === oldName) state.currentKey = name.trim();
       await refreshIndustryList();
       toast("已改名");
@@ -184,7 +184,7 @@
       if (!confirm(`删除行业「${name}」？\n该行业的产品配置也会一起删除。`)) return;
       const resp = await fetch(`/api/industries/${id}`, { method: "DELETE" })
         .then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
-      if (resp.code !== 0) { toast(resp.msg || "删除失败"); return; }
+      if (resp.code !== 0) { alert(resp.msg || "删除失败"); return; }
       if (state.currentKey === name) {
         state.currentKey = null;
         $("curIndustryName").textContent = "选择左侧行业";

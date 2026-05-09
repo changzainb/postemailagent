@@ -234,6 +234,7 @@ els.dlgForm.addEventListener('submit', async (event) => {
 });
 
 els.addBtn.addEventListener('click', openCreateDialog);
+document.getElementById('dlgCancel').addEventListener('click', () => els.dialog.close('cancel'));
 els.searchInput.addEventListener('input', (event) => {
   state.filterKeyword = event.target.value;
   renderProducts();

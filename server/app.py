@@ -35,8 +35,11 @@ def create_app():
 
     @app.get("/admin/industries")
     def page_admin_industries():
-        if not current_user():
+        user = current_user()
+        if not user:
             return redirect(url_for("page_login"))
+        if user.get("role") != "admin":
+            return ("需要 admin 角色才能访问行业管理。<a href='/admin'>返回规则后台</a>", 403)
         return render_template("admin_industries.html")
 
     @app.get("/login")
