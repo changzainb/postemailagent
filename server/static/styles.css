@@ -493,13 +493,20 @@ textarea[readonly] {
   }
 }
 .match-tag {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  font-size: 11px;
-  vertical-align: middle;
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
+  pointer-events: none;
 }
-.match-tag[data-kind="ok"] { background: #e6f4ea; color: #1e7e34; }
-.match-tag[data-kind="warn"] { background: #fff4e5; color: #b25400; }
+.match-tag:empty,
+.match-tag:not([data-kind]) { display: none; }
+.match-tag[data-kind="ok"] { display: none; }
+.match-tag[data-kind="warn"] { background: #e0a700; }
+.product-row { position: relative; }
 .product-row.unmatched { box-shadow: inset 3px 0 0 #e0a700; }

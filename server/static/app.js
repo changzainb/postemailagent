@@ -1,11 +1,11 @@
 const SCENARIO_KEYWORDS = {
-  aigc_media: ["漫剧", "短剧", "真人剧", "aigc", "AIGC", "内容制作", "生图", "生视频", "文生图", "文生视频", "影视", "媒资", "云点播"],
-  trtc_live: ["TRTC", "实时音视频", "直播", "音视频", "混流", "语音房", "社交"],
-  edge_cdn: ["CDN", "边缘加速", "EO", "内容分发"],
-  cvm_db: ["CVM", "云服务器", "数据库", "MySQL"],
-  cos: ["对象存储", "COS"],
-  security: ["天御", "审核", "安全", "人脸核身"],
-  mq: ["消息队列", "CKafka", "RocketMQ"],
+  aigc_media: ["漫剧", "短剧", "真人剧", "漫画", "动漫", "二次元", "aigc", "AIGC", "内容制作", "生图", "生视频", "文生图", "文生视频", "影视", "媒资", "MPS", "云点播", "VOD", "点播", "转码", "视频处理"],
+  trtc_live: ["TRTC", "实时音视频", "直播", "音视频", "混流", "语音房", "社交", "连麦", "K歌", "CSS", "云直播", "直播云", "游戏语音", "GME"],
+  edge_cdn: ["CDN", "边缘加速", "EdgeOne", "EO", "内容分发", "加速线路", "DCDN", "动态加速", "全球加速", "GAAP"],
+  cvm_db: ["CVM", "云服务器", "数据库", "MySQL", "Redis", "MongoDB", "PostgreSQL", "TDSQL", "CDB", "GPU", "裸金属", "高性能计算"],
+  cos: ["对象存储", "COS", "文件存储", "图片存储", "视频存储", "CFS"],
+  security: ["天御", "审核", "安全", "人脸核身", "内容安全", "OCR", "实名", "黑库", "反诈", "WAF", "DDoS", "验证码"],
+  mq: ["消息队列", "CKafka", "RocketMQ", "TDMQ", "Kafka", "Pulsar"],
 };
 
 const fixedApplicationInfo = {
