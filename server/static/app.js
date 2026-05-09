@@ -329,7 +329,7 @@ function buildThresholdWarnings(products) {
       const discount = parseDiscount(product.discount);
       const breakFloor = parseDiscount(product.breakthroughDiscount);
       if (discount != null && breakFloor != null && discount < breakFloor - 0.001) {
-        warnings.push(`产品${index + 1} ${product.name}：当前 ${product.discount} 低于商务特批政策 ${product.breakthroughDiscount}，建议先确认。`);
+        warnings.push(`产品${index + 1} ${product.name}：当前 ${product.discount} 低于商务突破政策 ${product.breakthroughDiscount}，建议先确认。`);
       }
       if (discount == null && product.discount) {
         warnings.push(`产品${index + 1} ${product.name}：折扣格式没识别到，建议写成 9折、95折、6折。`);

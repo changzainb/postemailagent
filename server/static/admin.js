@@ -110,23 +110,25 @@ function renderProducts() {
 }
 
 function productRow(p) {
-  const updated = p.rule_updated_at ? `${escapeHtml(p.updated_by || '-')}<br>${formatTime(p.rule_updated_at)}` : '<span class="muted">未维护</span>';
+  const updated = p.rule_updated_at
+    ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
+    : '<span class="muted" style="font-size:12px">未维护</span>';
   return `<tr data-id="${p.id}">
     <td class="col-name product-name">
       ${escapeHtml(p.name)}
       <small>${escapeHtml(p.scenario_label || '')}${(p.aliases || []).length ? ' · 别名 ' + escapeHtml((p.aliases || []).join(',')) : ''}</small>
     </td>
     <td><input type="text" data-field="normal_discount" value="${escapeHtml(p.normal_discount || '')}" placeholder="9折"></td>
-    <td><input type="text" data-field="normal_commission" value="${escapeHtml(p.normal_commission || '')}" placeholder="5%返佣 / 无返佣"></td>
+    <td><input type="text" data-field="normal_commission" value="${escapeHtml(p.normal_commission || '')}" placeholder="5%返佣"></td>
     <td><input type="text" data-field="breakthrough_discount" value="${escapeHtml(p.breakthrough_discount || '')}" placeholder="8折"></td>
-    <td><input type="text" data-field="breakthrough_commission" value="${escapeHtml(p.breakthrough_commission || '')}" placeholder="10%返佣 / 无返佣"></td>
-    <td style="text-align:center"><label class="commission-toggle"><input type="checkbox" data-field="no_commission" ${p.no_commission ? 'checked' : ''}><span>${p.no_commission ? '不支持' : '支持'}</span></label></td>
+    <td><input type="text" data-field="breakthrough_commission" value="${escapeHtml(p.breakthrough_commission || '')}" placeholder="10%返佣"></td>
+    <td style="text-align:center" title="返佣支持"><input type="checkbox" data-field="no_commission" ${p.no_commission ? '' : 'checked'}></td>
     <td><input type="text" data-field="remark" value="${escapeHtml(p.remark || '')}" placeholder="适用条件 / 注意事项"></td>
     <td>${updated}</td>
     <td class="actions">
-      <button class="primary small" data-action="save">保存规则</button>
-      <button class="ghost" data-action="edit">修改</button>
-      <button class="danger" data-action="archive">停用</button>
+      <button class="primary small" data-action="save" title="保存折扣返佣">保存</button>
+      <button class="icon-btn" data-action="edit" title="改产品名/场景/别名">改</button>
+      <button class="icon-btn danger" data-action="archive" title="停用">停</button>
     </td>
   </tr>`;
 }
@@ -155,7 +157,12 @@ async function saveRow(row, productId) {
   row.querySelectorAll('input').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
-    body[field] = input.type === 'checkbox' ? input.checked : input.value;
+    if (input.type === 'checkbox') {
+      // UI 复选框语义：勾 = 支持返佣；DB 字段是 no_commission（true = 不支持），需翻转
+      body[field] = field === 'no_commission' ? !input.checked : input.checked;
+    } else {
+      body[field] = input.value;
+    }
   });
   const resp = await fetchJson(`/api/products/${productId}/rule`, {
     method: 'PUT',
