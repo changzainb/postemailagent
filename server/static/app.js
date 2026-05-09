@@ -606,6 +606,62 @@ document.getElementById("restoreReasonsButton").addEventListener("click", buildR
 document.getElementById("matchProductsButton").addEventListener("click", matchProducts);
 industryInput.addEventListener("change", suggestScenario);
 industryInput.addEventListener("input", suggestScenario);
+
+// 自定义下拉：解决原生 datalist 选中后再点只显示当前匹配项的问题
+(function setupCombo() {
+  const combo = document.getElementById("industryCombo");
+  if (!combo) return;
+  const panel = combo.querySelector(".combo-panel");
+  const toggle = combo.querySelector(".combo-toggle");
+  const opts = JSON.parse(combo.dataset.options || "[]");
+  let activeIdx = -1;
+
+  function render(filter) {
+    const f = (filter || "").trim().toLowerCase();
+    const list = f ? opts.filter((o) => o.toLowerCase().includes(f)) : opts;
+    panel.innerHTML = list.map((o, i) => `<li role="option" data-v="${o}" class="${i === activeIdx ? "active" : ""}">${o}</li>`).join("") || `<li class="empty">无匹配，按回车保留输入</li>`;
+  }
+  function open(showAll) {
+    activeIdx = -1;
+    render(showAll ? "" : industryInput.value);
+    panel.hidden = false;
+    combo.classList.add("open");
+  }
+  function close() {
+    panel.hidden = true;
+    combo.classList.remove("open");
+  }
+  function pick(val) {
+    industryInput.value = val;
+    industryInput.dispatchEvent(new Event("input", { bubbles: true }));
+    industryInput.dispatchEvent(new Event("change", { bubbles: true }));
+    close();
+  }
+
+  toggle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    if (combo.classList.contains("open")) close();
+    else { open(true); industryInput.focus(); }
+  });
+  industryInput.addEventListener("focus", () => open(true));
+  industryInput.addEventListener("input", () => open(false));
+  industryInput.addEventListener("keydown", (e) => {
+    const items = panel.querySelectorAll("li[data-v]");
+    if (e.key === "ArrowDown") { e.preventDefault(); if (panel.hidden) open(true); activeIdx = Math.min(items.length - 1, activeIdx + 1); render(industryInput.value); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = Math.max(0, activeIdx - 1); render(industryInput.value); }
+    else if (e.key === "Enter") { if (activeIdx >= 0 && items[activeIdx]) { e.preventDefault(); pick(items[activeIdx].dataset.v); } else close(); }
+    else if (e.key === "Escape") close();
+  });
+  panel.addEventListener("mousedown", (e) => {
+    const li = e.target.closest("li[data-v]");
+    if (!li) return;
+    e.preventDefault();
+    pick(li.dataset.v);
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (!combo.contains(e.target)) close();
+  });
+})();
 fields.customerName.addEventListener("change", suggestScenario);
 fields.foundedYear.addEventListener("input", buildReasonText);
 fields.companyScale.addEventListener("input", buildReasonText);
