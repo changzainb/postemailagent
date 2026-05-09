@@ -10,31 +10,77 @@ const SCENARIO_KEYWORDS = {
 
 // 每个场景只默认加载这些关键词命中的产品，避免一口气列 32 个
 const SCENARIO_PRESET_TOKENS = {
-  aigc_media: ["云点播-流量计费", "云点播-标准存储", "云点播-AIGC-生图模型-Kling", "云点播-AIGC-生视频模型-Hunyuan", "云点播-AIGC-生视频模型-kling"],
-  trtc_live: ["高清视频月结", "高清视频日结", "标清视频月结", "语音月结", "混流转码"],
-  edge_cdn: ["边缘加速平台EO-企业版", "边缘加速平台EO-基础服务资费套餐（超额流量）-中国境内-后付费", "边缘加速平台EO-基础服务资费套餐（超额安全请求次数）-中国境内-后付费"],
-  cvm_db: ["云服务器cvm-标准型S4\u3001S5\u3001S6\u3001S8\u3001SA2\u3001SA3\u3001SA4\u3001SA5"],
-  cos: ["对象存储 COS-标准存储\u3001流量-后付费"],
-  security: ["天御-视频审核", "天御-文本审核", "天御-音频内容安全", "人脸核身"],
+  // AIGC：列出历史 ≥3 次的 14 条，MPS 子模型下沉到搜索
+  aigc_media: [
+    "云点播-流量计费",
+    "云点播-标准存储",
+    "云点播-AIGC-生图模型-GG",
+    "云点播-AIGC-生图模型-JV",
+    "云点播-AIGC-生图模型-Kling",
+    "云点播-AIGC-生图模型-SI",
+    "云点播-AIGC-生视频模型-GV",
+    "云点播-AIGC-生视频模型-Hunyuan",
+    "云点播-AIGC-生视频模型-JV",
+    "云点播-AIGC-生视频模型-OS",
+    "云点播-AIGC-生视频模型-SV",
+    "云点播-AIGC-生视频模型-hailuo",
+    "云点播-AIGC-生视频模型-kling",
+    "云点播-AIGC-生视频模型-vidu",
+    "云点播-AIGC-生视频模型-明眨",
+  ],
+  // TRTC：8 个主要计费档全列（历史 7-9 次都是高频）
+  trtc_live: [
+    "实时音视频TRTC-标清视频日结",
+    "实时音视频TRTC-标清视频月结",
+    "实时音视频TRTC-高清视频日结",
+    "实时音视频TRTC-高清视频月结",
+    "实时音视频TRTC-超高清视频月结",
+    "实时音视频TRTC-语音日结",
+    "实时音视频TRTC-语音月结",
+    "实时音视频TRTC-混流转码",
+  ],
+  edge_cdn: [
+    "边缘加速平台EO-企业版",
+    "边缘加速平台EO-基础服务资费套餐（超额流量）-中国境内-后付费",
+    "边缘加速平台EO-基础服务资费套餐（超额安全请求次数）-中国境内-后付费",
+  ],
+  // 出海专用的 EO 白名单
+  edge_cdn_overseas: [
+    "边缘加速平台EO-企业版",
+    "边缘加速平台EO-基础服务资费套餐（超额流量）-中国境内+海外地区-后付费",
+    "边缘加速平台EO-基础服务资费套餐（超额安全请求次数）-中国境内+海外地区-后付费",
+  ],
+  cvm_db: [
+    "云服务器cvm-标准型S4\u3001S5\u3001S6\u3001S8\u3001SA2\u3001SA3\u3001SA4\u3001SA5\uff1b\u8ba1\u7b97\u578bC3\u3001C5\u3001C6\uff08\u56fd\u5185\u5730\u533a\uff09",
+    "云服务器cvm-标准型S9",
+  ],
+  cvm_db_overseas: [
+    "云服务器cvm-\uff08\u4e2d\u56fd\u5883\u5185+\u6d77\u5916\u5730\u533a\uff09",
+  ],
+  cos: ["对象存储 COS-标准存储\u3001\u6d41\u91cf-\u540e\u4ed8\u8d39"],
+  // 安全：只默认视频审核 + 人脸核身（高频）
+  security: ["天御-视频审核", "人脸核身-基础版人脸核身\uff08\u6743\u5a01\u5e93\uff09"],
   mq: ["CKafka", "RocketMQ"],
 };
 
 // 行业关键词 → 需要叠加的场景（一个行业常同时需要几类产品）
 const INDUSTRY_SCENARIO_BUNDLES = {
-  "漫剧|短剧|aigc|内容制作|影视": ["aigc_media", "cos", "edge_cdn"],
+  // 出海 / 跨境优先判定，避免被下面的行业覆盖
+  "出海|海外|跨境": ["edge_cdn_overseas", "cvm_db_overseas", "cos", "security"],
+  "漫剧|短剧|aigc|内容制作|影视": ["aigc_media", "cos", "edge_cdn", "trtc_live"],
   "漫画|动漫|二次元": ["aigc_media", "cos", "edge_cdn"],
-  "直播|语音房|社交|连麦|K歌": ["trtc_live", "security", "cos"],
+  "直播|语音房|社交|连麦|K歌": ["trtc_live", "security", "cos", "edge_cdn"],
+  "会议|IM|即时通讯|协作": ["trtc_live", "cos", "security"],
   "游戏|互娱": ["cvm_db", "trtc_live", "cos", "edge_cdn"],
-  "短视频|图文|MCN|营销": ["cos", "edge_cdn", "aigc_media"],
-  "出海|海外": ["edge_cdn", "cvm_db", "cos"],
+  "短视频|图文|MCN|营销": ["cos", "edge_cdn", "aigc_media", "security"],
   "物联网|智能硬件": ["cvm_db", "mq", "cos"],
   "物流|交通运输": ["cvm_db", "mq", "cos"],
-  "教育|校园": ["trtc_live", "cos", "security"],
-  "医疗|健康": ["cvm_db", "cos", "security"],
-  "电商|零售|SaaS": ["cvm_db", "cos", "edge_cdn"],
-  "政企|信息化|软件开发": ["cvm_db", "cos"],
-  "金融|人脸核身": ["security", "cvm_db"],
-  "企业|网盘|OA": ["cvm_db", "cos"],
+  "教育|校园": ["trtc_live", "aigc_media", "cos", "security"],
+  "医疗|健康": ["trtc_live", "cvm_db", "cos", "security"],
+  "电商|零售|SaaS": ["cvm_db", "cos", "edge_cdn", "security"],
+  "政企|信息化|软件开发": ["cvm_db", "cos", "security"],
+  "金融|人脸核身": ["security", "cvm_db", "cos"],
+  "企业|网盘|OA": ["cvm_db", "cos", "edge_cdn"],
 };
 
 const fixedApplicationInfo = {
@@ -320,11 +366,12 @@ function findScenarioKey() {
 }
 
 function findScenarioBundle() {
-  const industry = industryInput.value.toLowerCase();
+  const industry = industryInput.value.trim().toLowerCase();
+  if (!industry) return [];
   for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
     if (pattern.toLowerCase().split("|").some((t) => industry.includes(t))) return keys;
   }
-  const wide = `${industryInput.value} ${fields.customerName.value} ${fields.currentProject.value}`.toLowerCase();
+  const wide = `${industryInput.value} ${fields.customerName.value}`.toLowerCase();
   for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
     if (pattern.toLowerCase().split("|").some((t) => wide.includes(t))) return keys;
   }
@@ -373,10 +420,30 @@ function buildReasonText() {
 function generateEmail() {
   const products = getProducts();
   renderThresholdWarnings(products);
+  // 标记缺折扣/返佣的行
+  let missingFields = 0;
+  document.querySelectorAll(".product-row").forEach((row) => {
+    const d = row.querySelector(".product-discount").value.trim();
+    const c = row.querySelector(".product-commission").value.trim();
+    if (!d || !c) {
+      row.classList.add("incomplete");
+      missingFields++;
+    } else {
+      row.classList.remove("incomplete");
+    }
+  });
   const productLines = products.map((product, index) => {
     const discount = product.discount || "待填写折扣";
-    return `【申请产品${index + 1}】：产品名称/折扣/返佣：${product.name || "待填写产品名称"}：${discount}/${product.commission}`;
+    const commission = product.commission || "待填写返佣";
+    return `【申请产品${index + 1}】：产品名称/折扣/返佣：${product.name || "待填写产品名称"}：${discount}/${commission}`;
   });
+
+  // 复制按钮根据缺失情况禁用
+  const copyBodyBtn = document.getElementById("copyBodyButton");
+  if (copyBodyBtn) {
+    copyBodyBtn.disabled = missingFields > 0;
+    copyBodyBtn.title = missingFields > 0 ? `还有 ${missingFields} 行折扣/返佣未填` : "";
+  }
 
   emailSubject.value = `${fields.customerName.value.trim() || "客户"}折扣返佣申请--广州西骋`;
   emailBody.value = `尊敬的${fields.managerTitle.value.trim() || "腾讯云渠道经理"}：
@@ -454,13 +521,20 @@ function addProduct(product = {}) {
   generateEmail();
 }
 
+// 出海变体 → 真实 scenario key（产品库里只有 edge_cdn / cvm_db）
+const SCENARIO_ALIAS = {
+  edge_cdn_overseas: "edge_cdn",
+  cvm_db_overseas: "cvm_db",
+};
+
 function resetProducts() {
   productList.innerHTML = "";
   if (!activeScenarioKey) return;
   const keys = Array.isArray(activeScenarioKey) ? activeScenarioKey : [activeScenarioKey];
   const seen = new Set();
   keys.forEach((key) => {
-    const scenario = catalog.scenarioByKey[key];
+    const realKey = SCENARIO_ALIAS[key] || key;
+    const scenario = catalog.scenarioByKey[realKey];
     if (!scenario) return;
     const tokens = SCENARIO_PRESET_TOKENS[key] || [];
     const all = catalog.productsByScenarioId.get(scenario.id) || [];
@@ -484,9 +558,25 @@ function applyScenario(scenarioKey = activeScenarioKey) {
     return;
   }
   const keys = Array.isArray(scenarioKey) ? scenarioKey : [scenarioKey];
-  const labels = keys.map((k) => catalog.scenarioByKey[k]?.label).filter(Boolean);
-  matchStatus.textContent = labels.length ? `已匹配场景：${labels.join(" + ")}` : "";
+  const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
+  matchStatus.textContent = labels.length ? `已匹配场景：${[...new Set(labels)].join(" + ")}` : "";
   resetProducts();
+}
+
+function suggestScenario() {
+  const keys = findScenarioBundle();
+  if (!keys.length) return;
+  // 列表为空 → 直接应用建议
+  if (productList.children.length === 0) {
+    applyScenario(keys);
+    return;
+  }
+  // 列表非空、且建议场景跟当前一致 → 不打扰
+  const current = Array.isArray(activeScenarioKey) ? activeScenarioKey : (activeScenarioKey ? [activeScenarioKey] : []);
+  if (keys.length === current.length && keys.every((k, i) => k === current[i])) return;
+  // 不同 → 提示，但不覆盖
+  const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
+  matchStatus.textContent = `行业已变 → 建议场景：${[...new Set(labels)].join(" + ")}（点"按行业重排产品"会重置当前列表）`;
 }
 
 function matchProducts() {
@@ -494,6 +584,9 @@ function matchProducts() {
   if (!keys.length) {
     matchStatus.textContent = "暂未匹配到场景，可手动新增产品。";
     return;
+  }
+  if (productList.children.length > 0) {
+    if (!confirm("按当前行业重新生成产品列表会覆盖当前已填内容，确定继续？")) return;
   }
   applyScenario(keys);
 }
@@ -511,12 +604,21 @@ fieldIds.forEach((id) => {
 document.getElementById("addProductButton").addEventListener("click", () => addProduct());
 document.getElementById("restoreReasonsButton").addEventListener("click", buildReasonText);
 document.getElementById("matchProductsButton").addEventListener("click", matchProducts);
-industryInput.addEventListener("change", matchProducts);
-fields.customerName.addEventListener("change", matchProducts);
+industryInput.addEventListener("change", suggestScenario);
+industryInput.addEventListener("input", suggestScenario);
+fields.customerName.addEventListener("change", suggestScenario);
 fields.foundedYear.addEventListener("input", buildReasonText);
 fields.companyScale.addEventListener("input", buildReasonText);
 fields.currentProject.addEventListener("input", buildReasonText);
-document.getElementById("resetButton").addEventListener("click", () => applyScenario());
+document.getElementById("resetButton").addEventListener("click", () => {
+  if (productList.children.length > 0 && !confirm("重置会清空所有已填字段和产品行，确定？")) return;
+  document.querySelectorAll('input[type="text"], input:not([type]), textarea').forEach((el) => {
+    if (el.id === "agentName" || el.id === "agentAccount" || el.id === "managerTitle") return;
+    if (el.readOnly) return;
+    el.value = "";
+  });
+  applyScenario();
+});
 document.getElementById("copySubjectButton").addEventListener("click", () => copyText(emailSubject.value, "标题"));
 document.getElementById("copyBodyButton").addEventListener("click", () => copyText(emailBody.value, "正文"));
 
@@ -524,5 +626,9 @@ document.getElementById("copyBodyButton").addEventListener("click", () => copyTe
   initializeFixedFields();
   initializeDefaultDates();
   await loadCatalog();
-  matchProducts();
+  // 首次加载：列表为空才自动划一份默认产品
+  if (productList.children.length === 0) {
+    const keys = findScenarioBundle();
+    if (keys.length) applyScenario(keys);
+  }
 })();

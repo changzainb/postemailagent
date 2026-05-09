@@ -510,3 +510,14 @@ textarea[readonly] {
 .match-tag[data-kind="warn"] { background: #e0a700; }
 .product-row { position: relative; }
 .product-row.unmatched { box-shadow: inset 3px 0 0 #e0a700; }
+.product-row.incomplete { box-shadow: inset 3px 0 0 #d83b01; }
+.product-row.incomplete .product-discount:placeholder-shown,
+.product-row.incomplete .product-commission:placeholder-shown {
+  border-color: #d83b01;
+  background: #fff5f0;
+}
+.primary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
