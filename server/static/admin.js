@@ -275,6 +275,10 @@ els.logoutBtn.addEventListener('click', async () => {
   window.location.href = '/login';
 });
 
+document.getElementById('changeLogBtn')?.addEventListener('click', () => {
+  if (window.ChangeLog) window.ChangeLog.open('rule');
+});
+
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'

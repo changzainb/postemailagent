@@ -188,11 +188,6 @@ def create_app():
         old = db.execute(
             "SELECT * FROM pricing_rules WHERE product_id=?", (product_id,)
         ).fetchone()
-        if old:
-            db.execute(
-                "INSERT INTO rule_history(product_id, snapshot, action, actor) VALUES (?, ?, 'update', ?)",
-                (product_id, json.dumps(dict(old), ensure_ascii=False, default=str), user.get("username", "")),
-            )
         fields = {
             "normal_discount": (body.get("normal_discount") or "").strip(),
             "normal_commission": (body.get("normal_commission") or "").strip(),
@@ -202,6 +197,27 @@ def create_app():
             "remark": (body.get("remark") or "").strip(),
             "updated_by": user.get("username", ""),
         }
+        # 计算 diff（只看业务字段，updated_by/at 不算）
+        diff_keys = ["normal_discount", "normal_commission", "breakthrough_discount",
+                     "breakthrough_commission", "no_commission", "remark"]
+        old_dict = dict(old) if old else {}
+        diff = {}
+        for k in diff_keys:
+            old_v = old_dict.get(k, "" if k != "no_commission" else 0)
+            new_v = fields[k]
+            if str(old_v) != str(new_v):
+                diff[k] = {"from": old_v, "to": new_v}
+        if diff or not old:
+            db.execute(
+                "INSERT INTO rule_history(product_id, snapshot, action, actor) VALUES (?, ?, ?, ?)",
+                (
+                    product_id,
+                    json.dumps({"before": old_dict, "after": fields, "diff": diff},
+                               ensure_ascii=False, default=str),
+                    "update" if old else "create",
+                    user.get("username", ""),
+                ),
+            )
         if old:
             db.execute(
                 "UPDATE pricing_rules SET normal_discount=?, normal_commission=?, "
@@ -225,7 +241,7 @@ def create_app():
                 ),
             )
         db.commit()
-        return jsonify({"code": 0})
+        return jsonify({"code": 0, "data": {"changed": bool(diff or not old), "diff": diff}})
 
     # ------- Match -------
     @app.post("/api/match")
@@ -461,6 +477,42 @@ def create_app():
             d["removed"] = json.loads(d.get("removed") or "[]")
             data.append(d)
         return jsonify({"code": 0, "data": data})
+
+    @app.get("/api/rule-history")
+    @require_role("admin")
+    def api_rule_history():
+        product_id = request.args.get("product_id", "").strip()
+        limit = min(int(request.args.get("limit", 200) or 200), 500)
+        sql = (
+            "SELECT h.id, h.product_id, h.snapshot, h.action, h.actor, h.created_at, "
+            "p.name AS product_name "
+            "FROM rule_history h LEFT JOIN products p ON p.id = h.product_id "
+        )
+        params = []
+        if product_id:
+            sql += "WHERE h.product_id=? "
+            params.append(int(product_id))
+        sql += "ORDER BY h.created_at DESC, h.id DESC LIMIT ?"
+        params.append(limit)
+        out = []
+        for r in get_db().execute(sql, params).fetchall():
+            d = dict(r)
+            try:
+                snap = json.loads(d.get("snapshot") or "{}")
+            except Exception:
+                snap = {}
+            # 兼容老格式（snapshot 直接是 pricing_rules dict）
+            if isinstance(snap, dict) and ("diff" in snap or "after" in snap or "before" in snap):
+                d["before"] = snap.get("before") or {}
+                d["after"] = snap.get("after") or {}
+                d["diff"] = snap.get("diff") or {}
+            else:
+                d["before"] = snap if isinstance(snap, dict) else {}
+                d["after"] = {}
+                d["diff"] = {}
+            d.pop("snapshot", None)
+            out.append(d)
+        return jsonify({"code": 0, "data": out})
 
     return app
 
