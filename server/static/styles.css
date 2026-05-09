@@ -116,6 +116,23 @@ h2 {
   align-items: end;
 }
 
+.customer-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-actions .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 label,
 .textarea-label {
   display: grid;
@@ -423,7 +440,8 @@ textarea[readonly] {
     position: static;
   }
 
-  .compact-grid {
+  .compact-grid,
+  .customer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -446,7 +464,8 @@ textarea[readonly] {
     flex-direction: column;
   }
 
-  .compact-grid {
+  .compact-grid,
+  .customer-grid {
     grid-template-columns: 1fr;
   }
 

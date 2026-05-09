@@ -15,15 +15,18 @@
             <p class="eyebrow">腾讯云代理商</p>
             <h1>特批价格邮件生成器</h1>
           </div>
-          <div style="display:flex;gap:8px;">
-            <a class="ghost-button" href="/admin" style="line-height:34px;text-decoration:none;">产品报价规则</a>
+          <div class="header-actions">
+            <a class="ghost-button" href="/admin">产品报价规则</a>
             <button class="ghost-button" id="resetButton" type="button">重置</button>
           </div>
         </header>
 
-        <details class="compact-section" open>
-          <summary>客户与项目</summary>
-          <div class="field-grid compact-grid">
+        <section class="section-block customer-section">
+          <div class="section-heading">
+            <h2>客户与项目</h2>
+            <button class="primary-button" id="matchProductsButton" type="button">自动匹配产品</button>
+          </div>
+          <div class="field-grid customer-grid">
             <label>
               <span>客户行业/业务</span>
               <input id="industryInput" list="industryOptions" value="漫剧 / 短剧 / AIGC 内容制作" placeholder="例如：漫剧、短剧、游戏、社交、SaaS">
@@ -51,10 +54,6 @@
               <span>申请结束日期</span>
               <input id="endDate" type="date">
             </label>
-            <label class="button-field">
-              <span>产品匹配</span>
-              <button class="primary-button" id="matchProductsButton" type="button">自动匹配产品</button>
-            </label>
           </div>
           <div class="fixed-info" aria-label="固定申请信息">
             <span>代理商：<strong id="agentNameText">广州西骋网络科技有限公司</strong></span>
@@ -64,7 +63,7 @@
           <input id="agentName" type="hidden" value="广州西骋网络科技有限公司">
           <input id="agentAccount" type="hidden" value="2677906140">
           <input id="managerTitle" type="hidden" value="腾讯云渠道经理">
-        </details>
+        </section>
 
         <section class="section-block">
           <div class="section-heading">
