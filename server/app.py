@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
@@ -272,36 +273,83 @@ def create_app():
         return jsonify({"code": 0, "data": [dict(row) for row in rows]})
 
     # ------- Industry → Products mapping -------
-    INDUSTRY_LIST = [
-        "漫剧 / 短剧 / AIGC 内容制作",
-        "漫画 / 动漫 / 二次元",
-        "直播 / 语音房 / 社交",
-        "游戏 / 互娱",
-        "短视频 / 图文社区",
-        "文化传媒 / MCN / 营销",
-        "媒资处理 / 视频审核",
-        "出海业务 / 海外内容",
-        "会议 / IM / 协作",
-        "物联网 / 智能硬件",
-        "物流 / 交通运输",
-        "教育 / 校园安防",
-        "医疗 / 健康",
-        "电商 / 零售 / SaaS",
-        "政企信息化 / 软件开发",
-        "金融 / 人脸核身",
-        "企业内部 IT / 网盘 / OA",
-    ]
+    def _industry_names():
+        return [r["name"] for r in get_db().execute(
+            "SELECT name FROM industries ORDER BY sort_order, id"
+        ).fetchall()]
 
     @app.get("/api/industries")
     def api_industries():
-        # 同时返回每个行业已配置的产品数，方便后台显示
         db = get_db()
         rows = db.execute(
-            "SELECT industry_key, COUNT(*) AS cnt FROM industry_products GROUP BY industry_key"
+            "SELECT i.id, i.name, i.sort_order, "
+            "(SELECT COUNT(*) FROM industry_products ip WHERE ip.industry_key = i.name) AS cnt "
+            "FROM industries i ORDER BY i.sort_order, i.id"
         ).fetchall()
-        counts = {r["industry_key"]: r["cnt"] for r in rows}
-        data = [{"key": name, "label": name, "count": counts.get(name, 0)} for name in INDUSTRY_LIST]
+        data = [{"id": r["id"], "key": r["name"], "label": r["name"], "sort_order": r["sort_order"], "count": r["cnt"]} for r in rows]
         return jsonify({"code": 0, "data": data})
+
+    @app.post("/api/industries")
+    @require_role("admin")
+    def api_industries_create():
+        body = request.get_json(silent=True) or {}
+        name = (body.get("name") or "").strip()
+        if not name:
+            return jsonify({"code": 400, "msg": "行业名必填"}), 400
+        db = get_db()
+        try:
+            order_row = db.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS o FROM industries").fetchone()
+            db.execute("INSERT INTO industries(name, sort_order) VALUES (?, ?)", (name, order_row["o"]))
+            db.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({"code": 409, "msg": "该行业已存在"}), 409
+        return jsonify({"code": 0})
+
+    @app.put("/api/industries/<int:ind_id>")
+    @require_role("admin")
+    def api_industries_update(ind_id):
+        body = request.get_json(silent=True) or {}
+        name = (body.get("name") or "").strip()
+        if not name:
+            return jsonify({"code": 400, "msg": "行业名必填"}), 400
+        db = get_db()
+        old = db.execute("SELECT name FROM industries WHERE id=?", (ind_id,)).fetchone()
+        if not old:
+            return jsonify({"code": 404, "msg": "行业不存在"}), 404
+        try:
+            db.execute("UPDATE industries SET name=? WHERE id=?", (name, ind_id))
+            # 同步重命名 industry_products 引用
+            if old["name"] != name:
+                db.execute("UPDATE industry_products SET industry_key=? WHERE industry_key=?", (name, old["name"]))
+            db.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({"code": 409, "msg": "重名冲突"}), 409
+        return jsonify({"code": 0})
+
+    @app.delete("/api/industries/<int:ind_id>")
+    @require_role("admin")
+    def api_industries_delete(ind_id):
+        db = get_db()
+        row = db.execute("SELECT name FROM industries WHERE id=?", (ind_id,)).fetchone()
+        if not row:
+            return jsonify({"code": 404, "msg": "行业不存在"}), 404
+        db.execute("DELETE FROM industry_products WHERE industry_key=?", (row["name"],))
+        db.execute("DELETE FROM industries WHERE id=?", (ind_id,))
+        db.commit()
+        return jsonify({"code": 0})
+
+    @app.put("/api/industries/reorder")
+    @require_role("admin")
+    def api_industries_reorder():
+        body = request.get_json(silent=True) or {}
+        ids = body.get("ids") or []
+        if not isinstance(ids, list):
+            return jsonify({"code": 400, "msg": "ids 必须是数组"}), 400
+        db = get_db()
+        for idx, iid in enumerate(ids):
+            db.execute("UPDATE industries SET sort_order=? WHERE id=?", (idx, int(iid)))
+        db.commit()
+        return jsonify({"code": 0})
 
     @app.get("/api/industry-products")
     def api_industry_products_all():
@@ -330,7 +378,7 @@ def create_app():
         ids = body.get("product_ids") or []
         if not isinstance(ids, list):
             return jsonify({"code": 400, "msg": "product_ids 必须是数组"}), 400
-        if industry_key not in INDUSTRY_LIST:
+        if industry_key not in _industry_names():
             return jsonify({"code": 400, "msg": "未知行业"}), 400
         db = get_db()
         try:

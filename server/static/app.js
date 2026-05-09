@@ -132,6 +132,7 @@ const catalog = {
   productsByScenarioId: new Map(),
   productById: new Map(),
   industryProducts: {}, // { industryKey: [productId, ...] }
+  industries: [], // [{key, label, count}]
 };
 let activeScenarioKey = null;
 
@@ -145,6 +146,7 @@ async function loadCatalog() {
     catalog.scenarios = scResp.data || [];
     catalog.products = prResp.data || [];
     catalog.industryProducts = ipResp.data || {};
+    catalog.industries = (await fetch("/api/industries").then((r) => r.json())).data || [];
     catalog.scenarioByKey = {};
     catalog.scenarioById = {};
     catalog.productsByScenarioId = new Map();
@@ -648,11 +650,14 @@ industryInput.addEventListener("input", suggestScenario);
   if (!combo) return;
   const panel = combo.querySelector(".combo-panel");
   const toggle = combo.querySelector(".combo-toggle");
-  const opts = JSON.parse(combo.dataset.options || "[]");
   let activeIdx = -1;
+  function getOpts() {
+    return (catalog.industries || []).map((i) => i.label || i.key);
+  }
 
   function render(filter) {
     const f = (filter || "").trim().toLowerCase();
+    const opts = getOpts();
     const list = f ? opts.filter((o) => o.toLowerCase().includes(f)) : opts;
     panel.innerHTML = list.map((o, i) => `<li role="option" data-v="${o}" class="${i === activeIdx ? "active" : ""}">${o}</li>`).join("") || `<li class="empty">无匹配，按回车保留输入</li>`;
   }

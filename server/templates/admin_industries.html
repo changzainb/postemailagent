@@ -8,13 +8,24 @@
   <style>
     .ind-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 24px; align-items: start; }
     .ind-side { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; max-height: calc(100vh - 130px); overflow-y: auto; }
+    .ind-side-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px 8px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
+    .ind-side-head input { flex: 1; height: 28px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0 8px; font-size: 12.5px; }
+    .ind-side-head button { background: #111827; color: #fff; border: none; height: 28px; padding: 0 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .ind-side-head button:hover { background: #000; }
     .ind-side ul { list-style: none; margin: 0; padding: 0; }
-    .ind-side li { display: flex; justify-content: space-between; align-items: center; padding: 9px 11px; border-radius: 7px; cursor: pointer; font-size: 13px; color: #1f2937; }
+    .ind-side li { display: flex; justify-content: space-between; align-items: center; padding: 9px 11px; border-radius: 7px; cursor: pointer; font-size: 13px; color: #1f2937; gap: 6px; }
     .ind-side li:hover { background: #f3f4f6; }
     .ind-side li.active { background: #1f2937; color: #fff; }
+    .ind-side li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ind-side li .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e5e7eb; color: #374151; min-width: 18px; text-align: center; }
     .ind-side li.active .badge { background: rgba(255,255,255,0.2); color: #fff; }
     .ind-side li .badge.zero { background: transparent; color: #9ca3af; }
+    .ind-side li .row-actions { display: none; gap: 4px; }
+    .ind-side li:hover .row-actions { display: inline-flex; }
+    .ind-side li .row-actions button { border: none; background: transparent; color: #6b7280; cursor: pointer; padding: 2px 4px; font-size: 11px; border-radius: 4px; }
+    .ind-side li .row-actions button:hover { background: #e5e7eb; color: #111827; }
+    .ind-side li.active .row-actions button { color: rgba(255,255,255,0.8); }
+    .ind-side li.active .row-actions button:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
     .ind-main { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 18px; max-height: calc(100vh - 130px); overflow-y: auto; }
     .ind-main h2 { margin: 0 0 4px; font-size: 16px; }
@@ -55,6 +66,10 @@
 
   <main class="ind-shell">
     <aside class="ind-side">
+      <div class="ind-side-head">
+        <input id="newIndInput" placeholder="新增行业名" maxlength="40">
+        <button id="newIndBtn">+ 添加</button>
+      </div>
       <ul id="industryList"></ul>
     </aside>
 
@@ -113,17 +128,72 @@
     function renderIndustryList() {
       const ul = $("industryList");
       ul.innerHTML = state.industries.map((i) => `
-        <li data-key="${i.key}" class="${i.key === state.currentKey ? "active" : ""}">
-          <span>${i.label}</span>
+        <li data-key="${i.key}" data-id="${i.id}" class="${i.key === state.currentKey ? "active" : ""}">
+          <span class="name" title="${i.label}">${i.label}</span>
+          <span class="row-actions">
+            <button data-act="rename" title="重命名">改名</button>
+            <button data-act="delete" title="删除">删</button>
+          </span>
           <span class="badge ${i.count === 0 ? "zero" : ""}">${i.count}</span>
         </li>
       `).join("");
       ul.querySelectorAll("li").forEach((li) => {
-        li.addEventListener("click", () => {
+        li.addEventListener("click", (e) => {
+          const act = e.target.closest("button")?.dataset.act;
+          if (act === "rename") return renameIndustry(li.dataset.id, li.dataset.key);
+          if (act === "delete") return deleteIndustry(li.dataset.id, li.dataset.key);
           if (state.dirty && !confirm("当前修改未保存，要切换吗？")) return;
           selectIndustry(li.dataset.key);
         });
       });
+    }
+
+    async function refreshIndustryList() {
+      const ind = await fetch("/api/industries").then((r) => r.json());
+      state.industries = ind.data || [];
+      renderIndustryList();
+    }
+
+    async function addIndustry() {
+      const name = ($("newIndInput").value || "").trim();
+      if (!name) return;
+      const resp = await fetch("/api/industries", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      }).then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
+      if (resp.code !== 0) { toast(resp.msg || "新增失败"); return; }
+      $("newIndInput").value = "";
+      await refreshIndustryList();
+      toast("已新增");
+    }
+
+    async function renameIndustry(id, oldName) {
+      const name = prompt("重命名行业", oldName);
+      if (!name || name === oldName) return;
+      const resp = await fetch(`/api/industries/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      }).then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
+      if (resp.code !== 0) { toast(resp.msg || "改名失败"); return; }
+      if (state.currentKey === oldName) state.currentKey = name.trim();
+      await refreshIndustryList();
+      toast("已改名");
+    }
+
+    async function deleteIndustry(id, name) {
+      if (!confirm(`删除行业「${name}」？\n该行业的产品配置也会一起删除。`)) return;
+      const resp = await fetch(`/api/industries/${id}`, { method: "DELETE" })
+        .then((r) => r.json()).catch(() => ({ code: -1, msg: "网络错误" }));
+      if (resp.code !== 0) { toast(resp.msg || "删除失败"); return; }
+      if (state.currentKey === name) {
+        state.currentKey = null;
+        $("curIndustryName").textContent = "选择左侧行业";
+        $("productPanel").innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:60px 0;">← 先选个行业</p>';
+        $("selCount").textContent = 0;
+        state.selected = new Set(); state.dirty = false; $("saveBtn").disabled = true;
+      }
+      await refreshIndustryList();
+      toast("已删除");
     }
 
     async function selectIndustry(key) {
@@ -132,7 +202,12 @@
       $("saveBtn").disabled = true;
       $("curIndustryName").textContent = key;
       renderIndustryList();
-      const resp = await fetch(`/api/industries/${encodeURIComponent(key)}/products`).then((r) => r.json());
+      // 同时拉最新产品库 + 该行业已选
+      const [pr, resp] = await Promise.all([
+        fetch("/api/products?status=active").then((r) => r.json()),
+        fetch(`/api/industries/${encodeURIComponent(key)}/products`).then((r) => r.json()),
+      ]);
+      state.products = pr.data || [];
       state.selected = new Set(resp.data || []);
       renderProductPanel();
       updateCount();
@@ -201,6 +276,8 @@
     function markDirty() { state.dirty = true; $("saveBtn").disabled = false; }
 
     $("filterInput").addEventListener("input", applyFilter);
+    $("newIndBtn").addEventListener("click", addIndustry);
+    $("newIndInput").addEventListener("keydown", (e) => { if (e.key === "Enter") addIndustry(); });
     $("saveBtn").addEventListener("click", async () => {
       const ids = [...state.selected];
       const resp = await fetch(`/api/industries/${encodeURIComponent(state.currentKey)}/products`, {
@@ -211,9 +288,13 @@
       if (resp.code !== 0) { toast(resp.msg || "保存失败（需要 admin 权限）"); return; }
       state.dirty = false;
       $("saveBtn").disabled = true;
-      // 刷新左侧 count
-      const ind = await fetch("/api/industries").then((r) => r.json());
+      // 刷新左侧 count 和最新产品库（admin 可能改过产品）
+      const [ind, pr] = await Promise.all([
+        fetch("/api/industries").then((r) => r.json()),
+        fetch("/api/products?status=active").then((r) => r.json()),
+      ]);
       state.industries = ind.data || [];
+      state.products = pr.data || [];
       renderIndustryList();
       toast(`已保存 ${ids.length} 个产品`);
     });

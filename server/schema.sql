@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 行业字典（后台维护）
+CREATE TABLE IF NOT EXISTS industries (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT UNIQUE NOT NULL,
+  sort_order  INTEGER DEFAULT 0,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 行业 → 产品 自定义映射（后台手动维护，前端按行业出产品列表）
 CREATE TABLE IF NOT EXISTS industry_products (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
