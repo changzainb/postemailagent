@@ -318,7 +318,7 @@ textarea:focus {
   margin-top: 14px;
 }
 
-.compact-section summary {
+.compact-section-title {
   display: flex;
   align-items: center;
   min-height: 38px;
@@ -326,15 +326,13 @@ textarea:focus {
   color: #344054;
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
-  user-select: none;
 }
 
-.compact-section[open] {
+.compact-section {
   padding-bottom: 12px;
 }
 
-.compact-section[open] summary {
+.compact-section-title {
   border-bottom: 1px solid var(--line-soft);
   margin-bottom: 12px;
 }
@@ -393,9 +391,7 @@ textarea[readonly] {
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  max-height: 460px;
-  overflow: auto;
-  padding-right: 2px;
+  overflow: visible;
 }
 
 .product-header,
@@ -582,11 +578,6 @@ textarea[readonly] {
 
   .reason-input-grid {
     grid-template-columns: 1fr;
-  }
-
-  .product-list {
-    max-height: 420px;
-    overflow: auto;
   }
 
   .product-header {

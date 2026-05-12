@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-product-suggest-clickfix">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-product-layout-fix">
 </head>
 <body>
   <main class="app-shell">
@@ -86,8 +86,8 @@
           <div class="product-list" id="productList"></div>
         </section>
 
-        <details class="compact-section reasons-section">
-          <summary>申请理由</summary>
+        <section class="compact-section reasons-section" aria-labelledby="reasonsTitle">
+          <div class="compact-section-title" id="reasonsTitle">申请理由</div>
           <div class="section-heading inline-heading">
             <span>填素材，系统润色成邮件理由</span>
             <button class="ghost-button" id="restoreReasonsButton" type="button">生成理由</button>
@@ -122,7 +122,7 @@
             <span>代理商贡献说明</span>
             <textarea id="agentContribution" rows="4" readonly>代理商能提供本地化服务，帮助客户提供测试、选型，以及在产品上问题的解答和服务的跟进，同时代理商在引导客户新项目更多的转向腾讯云等起了关键作用，比如客情攻关及技术服务。</textarea>
           </label>
-        </details>
+        </section>
       </div>
 
       <aside class="panel output-panel">
@@ -191,6 +191,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-product-suggest-clickfix"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-product-layout-fix"></script>
 </body>
 </html>
