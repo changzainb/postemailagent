@@ -120,6 +120,7 @@ const emailSubject = document.getElementById("emailSubject");
 const emailBody = document.getElementById("emailBody");
 const copyStatus = document.getElementById("copyStatus");
 const industryInput = document.getElementById("industryInput");
+const industryTagsEl = document.getElementById("industryTags");
 const matchStatus = document.getElementById("matchStatus");
 const thresholdBox = document.getElementById("thresholdBox");
 const thresholdList = document.getElementById("thresholdList");
@@ -134,7 +135,7 @@ const catalog = {
   industryProducts: {}, // { industryKey: [productId, ...] }
   industries: [], // [{key, label, count}]
 };
-let activeScenarioKey = null;
+let selectedIndustryTags = new Set();
 
 async function loadCatalog() {
   try {
@@ -300,6 +301,7 @@ function setupBillingModeSelect(row, modes, preferred) {
 
 function getProducts() {
   return Array.from(productList.querySelectorAll(".product-row")).map((row) => ({
+    productId: row.dataset.productId || "",
     name: row.querySelector(".product-name").value.trim(),
     billingMode: row.querySelector(".product-billing-mode").value,
     priceType: row.querySelector(".product-price-type")?.value || row.dataset.priceType || "discount",
@@ -315,6 +317,16 @@ function getProducts() {
     matched: row.dataset.matched === "1",
     suggesting: row.dataset.suggesting === "1",
   })).filter((p) => p.name || p.discount || p.commission);
+}
+
+function hasFilledProductRows() {
+  return Array.from(productList.querySelectorAll(".product-row")).some((row) => {
+    const name = row.querySelector(".product-name").value.trim();
+    const discount = row.querySelector(".product-discount").value.trim();
+    const unit = row.querySelector(".product-price-unit")?.value.trim() || "";
+    const commission = row.querySelector(".product-commission").value.trim();
+    return Boolean(name || discount || unit || commission);
+  });
 }
 
 function applyModeToRow(row, mode) {
@@ -359,6 +371,7 @@ function applyMatchedRule(row, matched) {
   row.dataset.suggesting = "0";
   if (!matched) {
     row.dataset.matched = "0";
+    row.dataset.productId = "";
     row.dataset.normalDiscount = "";
     row.dataset.normalCommission = "";
     row.dataset.breakthroughDiscount = "";
@@ -577,11 +590,50 @@ function buildThresholdWarnings(products) {
   });
 }
 
+function getDuplicateProductGroups() {
+  const groups = new Map();
+  Array.from(productList.querySelectorAll(".product-row")).forEach((row, index) => {
+    const name = row.querySelector(".product-name").value.trim();
+    if (!name) return;
+    const productId = row.dataset.productId || "";
+    const normalizedName = normalizeSearchText(name);
+    if (!productId && !normalizedName) return;
+    const key = productId ? `id:${productId}` : `name:${normalizedName}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({row, index, name});
+  });
+  return Array.from(groups.values()).filter((group) => group.length > 1);
+}
+
+function markDuplicateProducts() {
+  productList.querySelectorAll(".product-row").forEach((row) => {
+    row.classList.remove("duplicate");
+    row.title = "";
+  });
+  const groups = getDuplicateProductGroups();
+  groups.forEach((group) => {
+    group.forEach(({row}) => {
+      row.classList.add("duplicate");
+      row.title = "可能存在重复产品，请检查后再发送邮件";
+    });
+  });
+  return groups;
+}
+
 function renderThresholdWarnings(products) {
   const warnings = buildThresholdWarnings(products);
+  const duplicateGroups = markDuplicateProducts();
   thresholdList.innerHTML = "";
-  thresholdBox.classList.toggle("has-warning", warnings.length > 0);
-  if (warnings.length === 0) {
+  thresholdBox.classList.toggle("has-warning", warnings.length > 0 || duplicateGroups.length > 0);
+  thresholdBox.classList.toggle("has-duplicate", duplicateGroups.length > 0);
+  duplicateGroups.forEach((group) => {
+    const item = document.createElement("li");
+    item.className = "duplicate-warning";
+    const positions = group.map(({index}) => `产品${index + 1}`).join("、");
+    item.innerHTML = `<strong><span aria-hidden="true">!</span> 可能有重复的产品，请检查后再发送邮件：</strong>${escapeHtml(positions)} · ${escapeHtml(group[0].name)}`;
+    thresholdList.appendChild(item);
+  });
+  if (warnings.length === 0 && duplicateGroups.length === 0) {
     const item = document.createElement("li");
     item.textContent = "已按报价规则校验，无明显异常。";
     thresholdList.appendChild(item);
@@ -603,29 +655,23 @@ function renderProductNumbers() {
   });
 }
 
-function findScenarioKey() {
-  const input = `${industryInput.value} ${fields.customerName.value}`.toLowerCase();
+function findScenarioKeyForText(text) {
+  const input = String(text || "").toLowerCase();
   for (const [key, keywords] of Object.entries(SCENARIO_KEYWORDS)) {
     if (keywords.some((kw) => input.includes(kw.toLowerCase()))) return key;
   }
   return null;
 }
 
-function findScenarioBundle() {
-  const industry = industryInput.value.trim();
+function findScenarioBundleForIndustry(industry) {
   if (!industry) return [];
-  // 后台已配置过该行业 → 用特殊 marker，让 applyScenario/resetProducts 走自定义路径
   const customIds = catalog.industryProducts[industry];
   if (customIds && customIds.length) return ["__custom__"];
   const lower = industry.toLowerCase();
   for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
     if (pattern.toLowerCase().split("|").some((t) => lower.includes(t))) return keys;
   }
-  const wide = `${industryInput.value} ${fields.customerName.value}`.toLowerCase();
-  for (const [pattern, keys] of Object.entries(INDUSTRY_SCENARIO_BUNDLES)) {
-    if (pattern.toLowerCase().split("|").some((t) => wide.includes(t))) return keys;
-  }
-  const single = findScenarioKey();
+  const single = findScenarioKeyForText(industry);
   return single ? [single] : [];
 }
 
@@ -644,7 +690,8 @@ function formatCompetitorQuote(competitors) {
 }
 
 function getCompetitorPool() {
-  const input = `${industryInput.value} ${fields.customerName.value} ${fields.currentProject.value}`.toLowerCase();
+  const industryText = Array.from(selectedIndustryTags).join(" ");
+  const input = `${industryText} ${industryInput.value} ${fields.customerName.value} ${fields.currentProject.value}`.toLowerCase();
   if (/语音|聊天|社交|rtc|即时通讯/.test(input)) return competitorPools.voiceSocial;
   return competitorPools.cloud;
 }
@@ -794,25 +841,15 @@ const SCENARIO_ALIAS = {
   cvm_db_overseas: "cvm_db",
 };
 
-function resetProducts() {
-  productList.innerHTML = "";
-  if (!activeScenarioKey) return;
-  // 优先用后台配的 industry → product id 列表
-  const industry = industryInput.value.trim();
+function resolveIndustryProducts(industry) {
   const customIds = catalog.industryProducts[industry];
   if (customIds && customIds.length) {
-    const seen = new Set();
-    customIds.forEach((pid) => {
-      const p = catalog.productById.get(pid);
-      if (!p || seen.has(p.id)) return;
-      seen.add(p.id);
-      addProduct(p);
-    });
-    return;
+    return customIds.map((pid) => catalog.productById.get(pid)).filter(Boolean);
   }
-  const keys = Array.isArray(activeScenarioKey) ? activeScenarioKey : [activeScenarioKey];
-  const seen = new Set();
+  const keys = findScenarioBundleForIndustry(industry);
+  const products = [];
   keys.forEach((key) => {
+    if (key === "__custom__") return;
     const realKey = SCENARIO_ALIAS[key] || key;
     const scenario = catalog.scenarioByKey[realKey];
     if (!scenario) return;
@@ -821,67 +858,88 @@ function resetProducts() {
     const filtered = tokens.length
       ? all.filter((p) => tokens.some((t) => p.name.includes(t)))
       : all.slice(0, 5);
-    filtered.forEach((p) => {
-      if (seen.has(p.id)) return;
-      seen.add(p.id);
-      addProduct(p);
-    });
+    filtered.forEach((p) => products.push(p));
   });
+  return products;
 }
 
-function applyScenario(scenarioKey = activeScenarioKey) {
-  activeScenarioKey = scenarioKey;
-  if (!scenarioKey || (Array.isArray(scenarioKey) && scenarioKey.length === 0)) {
-    matchStatus.textContent = "未匹配到行业方案；可在下方产品名称输入点播、云点播、TRTC 等关键词选择产品。";
-    productList.innerHTML = "";
+function getProductsForSelectedIndustries() {
+  const products = [];
+  selectedIndustryTags.forEach((industry) => {
+    resolveIndustryProducts(industry).forEach((product) => products.push(product));
+  });
+  return products;
+}
+
+function renderIndustryTags() {
+  if (!industryTagsEl) return;
+  const tags = Array.from(selectedIndustryTags);
+  if (!tags.length) {
+    industryTagsEl.innerHTML = `<span class="industry-tags-empty">未选择行业标签</span>`;
+    return;
+  }
+  industryTagsEl.innerHTML = tags.map((tag) => `<button type="button" class="industry-tag" data-tag="${escapeHtml(tag)}" title="移除行业标签">
+    <span>${escapeHtml(tag)}</span><b aria-hidden="true">×</b>
+  </button>`).join("");
+}
+
+function updateIndustryStatus() {
+  const tags = Array.from(selectedIndustryTags);
+  if (!tags.length) {
+    matchStatus.textContent = "选择一个或多个行业标签后，点击应用生成产品。";
+    return;
+  }
+  const count = getProductsForSelectedIndustries().length;
+  matchStatus.textContent = `已选：${tags.join("、")} · 将生成 ${count} 个产品，重复项会保留并提醒。`;
+}
+
+function addIndustryTag(value) {
+  const tag = (value || "").trim();
+  if (!tag) return false;
+  selectedIndustryTags.add(tag);
+  industryInput.value = "";
+  renderIndustryTags();
+  updateIndustryStatus();
+  return true;
+}
+
+function toggleIndustryTag(value) {
+  const tag = (value || "").trim();
+  if (!tag) return false;
+  if (selectedIndustryTags.has(tag)) selectedIndustryTags.delete(tag);
+  else selectedIndustryTags.add(tag);
+  industryInput.value = "";
+  renderIndustryTags();
+  updateIndustryStatus();
+  return true;
+}
+
+function removeIndustryTag(value) {
+  selectedIndustryTags.delete(value);
+  renderIndustryTags();
+  updateIndustryStatus();
+}
+
+function applyIndustryTags() {
+  addIndustryTag(industryInput.value);
+  if (!selectedIndustryTags.size) {
+    matchStatus.textContent = "先选择至少一个行业标签。";
+    return;
+  }
+  const recommended = getProductsForSelectedIndustries();
+  if (hasFilledProductRows() && !confirm("应用行业标签会用推荐产品重置当前申请产品，确定继续？")) return;
+  productList.innerHTML = "";
+  if (!recommended.length) {
     addProduct();
-    generateEmail();
+    matchStatus.textContent = "这些行业标签暂未匹配到产品；可在产品名称里手动搜索补全。";
     return;
   }
-  const keys = Array.isArray(scenarioKey) ? scenarioKey : [scenarioKey];
-  if (keys.includes("__custom__")) {
-    const industry = industryInput.value.trim();
-    const ids = catalog.industryProducts[industry] || [];
-    matchStatus.textContent = `按后台配置：${industry} → ${ids.length} 个产品`;
-  } else {
-    const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
-    matchStatus.textContent = labels.length ? `已匹配场景：${[...new Set(labels)].join(" + ")}` : "";
-  }
-  resetProducts();
-}
-
-function suggestScenario() {
-  const keys = findScenarioBundle();
-  if (!keys.length) return;
-  // 列表为空 → 直接应用建议
-  if (productList.children.length === 0) {
-    applyScenario(keys);
-    return;
-  }
-  // 列表非空、且建议场景跟当前一致 → 不打扰
-  const current = Array.isArray(activeScenarioKey) ? activeScenarioKey : (activeScenarioKey ? [activeScenarioKey] : []);
-  if (keys.length === current.length && keys.every((k, i) => k === current[i])) return;
-  // 不同 → 提示，但不覆盖
-  if (keys.includes("__custom__")) {
-    const industry = industryInput.value.trim();
-    const n = (catalog.industryProducts[industry] || []).length;
-    matchStatus.textContent = `行业已变 → 后台已配 ${n} 个产品（点"按行业重排产品"会重置当前列表）`;
-  } else {
-    const labels = keys.map((k) => catalog.scenarioByKey[SCENARIO_ALIAS[k] || k]?.label).filter(Boolean);
-    matchStatus.textContent = `行业已变 → 建议场景：${[...new Set(labels)].join(" + ")}（点"按行业重排产品"会重置当前列表）`;
-  }
+  recommended.forEach((product) => addProduct(product));
+  updateIndustryStatus();
 }
 
 function matchProducts() {
-  const keys = findScenarioBundle();
-  if (!keys.length) {
-    matchStatus.textContent = "未匹配到行业方案；可在下方产品名称输入点播、云点播、TRTC 等关键词选择产品。";
-    return;
-  }
-  if (productList.children.length > 0) {
-    if (!confirm("按当前行业重新生成产品列表会覆盖当前已填内容，确定继续？")) return;
-  }
-  applyScenario(keys);
+  applyIndustryTags();
 }
 
 async function copyText(text, label) {
@@ -897,8 +955,16 @@ fieldIds.forEach((id) => {
 document.getElementById("addProductButton").addEventListener("click", () => addProduct());
 document.getElementById("restoreReasonsButton").addEventListener("click", buildReasonText);
 document.getElementById("matchProductsButton").addEventListener("click", matchProducts);
-industryInput.addEventListener("change", suggestScenario);
-industryInput.addEventListener("input", suggestScenario);
+industryInput.addEventListener("change", updateIndustryStatus);
+industryInput.addEventListener("input", updateIndustryStatus);
+if (industryTagsEl) {
+  industryTagsEl.addEventListener("click", (event) => {
+    const btn = event.target.closest(".industry-tag[data-tag]");
+    if (!btn) return;
+    removeIndustryTag(btn.dataset.tag);
+    generateEmail();
+  });
+}
 
 // 自定义下拉：解决原生 datalist 选中后再点只显示当前匹配项的问题
 (function setupCombo() {
@@ -915,7 +981,10 @@ industryInput.addEventListener("input", suggestScenario);
     const f = (filter || "").trim().toLowerCase();
     const opts = getOpts();
     const list = f ? opts.filter((o) => o.toLowerCase().includes(f)) : opts;
-    panel.innerHTML = list.map((o, i) => `<li role="option" data-v="${o}" class="${i === activeIdx ? "active" : ""}">${o}</li>`).join("") || `<li class="empty">无匹配，按回车保留输入</li>`;
+    panel.innerHTML = list.map((o, i) => {
+      const selected = selectedIndustryTags.has(o);
+      return `<li role="option" data-v="${escapeHtml(o)}" class="${i === activeIdx ? "active" : ""} ${selected ? "selected" : ""}" aria-selected="${selected ? "true" : "false"}"><span class="combo-check" aria-hidden="true"></span><span>${escapeHtml(o)}</span></li>`;
+    }).join("") || `<li class="empty">无匹配，按回车保留输入</li>`;
   }
   function open(showAll) {
     activeIdx = -1;
@@ -928,10 +997,9 @@ industryInput.addEventListener("input", suggestScenario);
     combo.classList.remove("open");
   }
   function pick(val) {
-    industryInput.value = val;
-    industryInput.dispatchEvent(new Event("input", { bubbles: true }));
-    industryInput.dispatchEvent(new Event("change", { bubbles: true }));
-    close();
+    toggleIndustryTag(val);
+    render(industryInput.value);
+    industryInput.focus();
   }
 
   toggle.addEventListener("mousedown", (e) => {
@@ -945,7 +1013,7 @@ industryInput.addEventListener("input", suggestScenario);
     const items = panel.querySelectorAll("li[data-v]");
     if (e.key === "ArrowDown") { e.preventDefault(); if (panel.hidden) open(true); activeIdx = Math.min(items.length - 1, activeIdx + 1); render(industryInput.value); }
     else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = Math.max(0, activeIdx - 1); render(industryInput.value); }
-    else if (e.key === "Enter") { if (activeIdx >= 0 && items[activeIdx]) { e.preventDefault(); pick(items[activeIdx].dataset.v); } else close(); }
+    else if (e.key === "Enter") { e.preventDefault(); if (activeIdx >= 0 && items[activeIdx]) pick(items[activeIdx].dataset.v); else toggleIndustryTag(industryInput.value); }
     else if (e.key === "Escape") close();
   });
   panel.addEventListener("mousedown", (e) => {
@@ -958,18 +1026,21 @@ industryInput.addEventListener("input", suggestScenario);
     if (!combo.contains(e.target)) close();
   });
 })();
-fields.customerName.addEventListener("change", suggestScenario);
 fields.foundedYear.addEventListener("input", buildReasonText);
 fields.companyScale.addEventListener("input", buildReasonText);
 fields.currentProject.addEventListener("input", buildReasonText);
 document.getElementById("resetButton").addEventListener("click", () => {
-  if (productList.children.length > 0 && !confirm("重置会清空所有已填字段和产品行，确定？")) return;
+  if (hasFilledProductRows() && !confirm("重置会清空所有已填字段和产品行，确定？")) return;
   document.querySelectorAll('input[type="text"], input:not([type]), textarea').forEach((el) => {
     if (el.id === "agentName" || el.id === "agentAccount" || el.id === "managerTitle") return;
     if (el.readOnly) return;
     el.value = "";
   });
-  applyScenario();
+  selectedIndustryTags = new Set();
+  renderIndustryTags();
+  productList.innerHTML = "";
+  addProduct();
+  updateIndustryStatus();
 });
 document.getElementById("copySubjectButton").addEventListener("click", () => copyText(emailSubject.value, "标题"));
 document.getElementById("copyBodyButton").addEventListener("click", () => copyText(emailBody.value, "正文"));
@@ -978,10 +1049,9 @@ document.getElementById("copyBodyButton").addEventListener("click", () => copyTe
   initializeFixedFields();
   initializeDefaultDates();
   await loadCatalog();
-  // 首次加载：列表为空才自动划一份默认产品
+  renderIndustryTags();
+  updateIndustryStatus();
   if (productList.children.length === 0) {
-    const keys = findScenarioBundle();
-    if (keys.length) applyScenario(keys);
-    else addProduct();
+    addProduct();
   }
 })();
