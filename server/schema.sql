@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS pricing_rules (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
   product_id               INTEGER UNIQUE NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   price_type               TEXT DEFAULT 'discount',
+  price_unit               TEXT DEFAULT '',
   normal_discount          TEXT DEFAULT '',
   normal_commission        TEXT DEFAULT '',
   breakthrough_discount    TEXT DEFAULT '',

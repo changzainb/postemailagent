@@ -40,6 +40,8 @@ def init_db():
                 "UPDATE pricing_rules SET price_type='fixed_price' "
                 "WHERE product_id IN (SELECT id FROM products WHERE name LIKE '%一口价%')"
             )
+        if "price_unit" not in columns:
+            conn.execute("ALTER TABLE pricing_rules ADD COLUMN price_unit TEXT DEFAULT ''")
         scenario_columns = {row[1] for row in conn.execute("PRAGMA table_info(scenarios)").fetchall()}
         if "label" in scenario_columns:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scenarios_label ON scenarios(label)")

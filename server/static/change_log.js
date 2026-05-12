@@ -3,6 +3,7 @@
 (function () {
   const FIELD_LABELS = {
     price_type: "价格模式",
+    price_unit: "一口价单位",
     normal_discount: "常规折扣",
     normal_commission: "常规返佣",
     breakthrough_discount: "突破折扣",

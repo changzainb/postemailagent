@@ -257,6 +257,7 @@ function parseCommissionNum(s) {
 
 function productRow(p) {
   const priceType = normalizePriceType(p.price_type, p.name || '');
+  const priceUnit = p.price_unit || '';
   const updated = p.rule_updated_at
     ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
     : '<span class="muted" style="font-size:12px">未维护</span>';
@@ -272,7 +273,7 @@ function productRow(p) {
       return `<div class="rule-item">
         <span class="rule-label">${label.replace('折扣', '一口价')}</span>
         <span class="cell-view rule-value" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
-        <input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="如：0.357/g 或 一口价说明" hidden>
+        <input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="如：0.357 或 一口价说明" hidden>
       </div>`;
     }
     const num = suffix === '折' ? parseDiscountNum(val) : parseCommissionNum(val);
@@ -315,6 +316,11 @@ function productRow(p) {
             <option value="fixed_price" ${priceType === 'fixed_price' ? 'selected' : ''}>一口价</option>
           </select>
         </div>
+        ${priceType === 'fixed_price' ? `<div class="rule-item rule-item-wide price-unit-item">
+          <span class="rule-label">一口价单位</span>
+          <span class="cell-view rule-value" data-view="price_unit">${priceUnit ? escapeHtml(priceUnit) : '<span class="muted">—</span>'}</span>
+          <input class="cell-edit price-unit-edit" type="text" data-field="price_unit" value="${escapeHtml(priceUnit)}" placeholder="如：/g、/千分钟、/GB" hidden>
+        </div>` : ''}
         <div class="rule-item rule-item-wide">
           <span class="rule-label">计费方式</span>
           <span class="cell-view billing-mode-view" data-view="billing_modes" title="${escapeHtml(billingModeText(billingModes))}">${billingModeBadges(billingModes)}</span>
@@ -364,7 +370,7 @@ function replacePriceEditor(row, field, fixedPrice) {
   const oldEdit = ruleItem.querySelector('.cell-edit');
   if (!oldEdit) return;
   if (fixedPrice) {
-    oldEdit.outerHTML = `<input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(value)}" placeholder="如：0.357/g 或 一口价说明">`;
+    oldEdit.outerHTML = `<input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(value)}" placeholder="如：0.357 或 一口价说明">`;
   } else {
     oldEdit.outerHTML = `<span class="cell-edit input-suffix" data-suffix-field="${field}">
       <input type="text" inputmode="decimal" data-field="${field}" data-suffix="折" value="${escapeHtml(parseDiscountNum(value) || value)}" placeholder="${field === 'normal_discount' ? '9' : '8'}">
@@ -377,7 +383,28 @@ function syncPriceTypeEditors(row, priceType) {
   const fixedPrice = priceType === 'fixed_price';
   replacePriceEditor(row, 'normal_discount', fixedPrice);
   replacePriceEditor(row, 'breakthrough_discount', fixedPrice);
+  syncPriceUnitEditor(row, fixedPrice);
   bindInlineEditors(row);
+}
+
+function syncPriceUnitEditor(row, fixedPrice) {
+  const grid = row.querySelector('.rule-grid');
+  let item = row.querySelector('.price-unit-item');
+  if (!fixedPrice) {
+    if (item) item.remove();
+    return;
+  }
+  if (item) return;
+  const priceTypeItem = row.querySelector('[data-view="price_type"]')?.closest('.rule-item');
+  item = document.createElement('div');
+  item.className = 'rule-item rule-item-wide price-unit-item';
+  item.innerHTML = `<span class="rule-label">一口价单位</span>
+    <span class="cell-view rule-value" data-view="price_unit">—</span>
+    <input class="cell-edit price-unit-edit" type="text" data-field="price_unit" value="" placeholder="如：/g、/千分钟、/GB">`;
+  if (row.classList.contains('editing')) {
+    item.querySelector('.cell-view').hidden = true;
+  }
+  grid.insertBefore(item, priceTypeItem?.nextSibling || grid.firstChild);
 }
 
 function bindInlineEditors(row) {

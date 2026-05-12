@@ -241,18 +241,34 @@ function priceTypeLabel(value) {
   return normalizePriceType(value) === "fixed_price" ? "价格" : "折扣";
 }
 
+function formatFixedPrice(value, unit) {
+  const price = String(value || "").trim();
+  const suffix = String(unit || "").trim();
+  if (!price) return "";
+  if (!suffix) return price;
+  return `${price}${suffix}`;
+}
+
 function setupProductPriceControls(row, priceType = row.dataset.priceType || "discount") {
   const type = normalizePriceType(priceType, row.querySelector(".product-name")?.value || "");
   row.dataset.priceType = type;
   const select = row.querySelector(".product-price-mode");
   const priceInput = row.querySelector(".product-discount");
+  const unitField = row.querySelector(".product-unit-field");
+  const unitInput = row.querySelector(".product-price-unit");
+  row.classList.toggle("fixed-price", type === "fixed_price");
   if (select) {
     select.querySelector('option[value="default"]').textContent = type === "fixed_price" ? "常规一口价" : "常规政策";
     select.querySelector('option[value="breakthrough"]').textContent = type === "fixed_price" ? "突破一口价" : "突破政策";
     select.querySelector('option[value="manual"]').textContent = type === "fixed_price" ? "手动价格" : "手动";
   }
   if (priceInput) {
-    priceInput.placeholder = type === "fixed_price" ? "例如：0.357/g 或 一口价说明" : "例如：95折";
+    priceInput.placeholder = type === "fixed_price" ? "例如：0.357 或 一口价说明" : "例如：95折";
+  }
+  if (unitField && unitInput) {
+    unitField.hidden = type !== "fixed_price";
+    unitInput.disabled = type !== "fixed_price";
+    if (type !== "fixed_price") unitInput.value = "";
   }
 }
 
@@ -278,6 +294,7 @@ function getProducts() {
     billingMode: row.querySelector(".product-billing-mode").value,
     priceMode: row.querySelector(".product-price-mode").value,
     discount: row.querySelector(".product-discount").value.trim(),
+    priceUnit: row.querySelector(".product-price-unit")?.value.trim() || "",
     commission: normalizeCommission(row.querySelector(".product-commission").value),
     priceType: row.dataset.priceType || "discount",
     normalDiscount: row.dataset.normalDiscount || "",
@@ -322,8 +339,10 @@ function applyMatchedRule(row, matched) {
     row.dataset.normalCommission = "";
     row.dataset.breakthroughDiscount = "";
     row.dataset.breakthroughCommission = "";
+    row.dataset.priceUnit = "";
     row.dataset.priceType = "discount";
     setupProductPriceControls(row, "discount");
+    row.querySelector(".product-price-unit").value = "";
     setupBillingModeSelect(row, ["prepaid", "postpaid"], row.querySelector(".product-billing-mode").value);
     row.dataset.noCommission = "0";
     row.classList.add("unmatched");
@@ -336,8 +355,10 @@ function applyMatchedRule(row, matched) {
   row.dataset.normalCommission = matched.normal_commission || "";
   row.dataset.breakthroughDiscount = matched.breakthrough_discount || "";
   row.dataset.breakthroughCommission = matched.breakthrough_commission || "";
+  row.dataset.priceUnit = matched.price_unit || "";
   row.dataset.priceType = normalizePriceType(matched.price_type, matched.name);
   setupProductPriceControls(row, row.dataset.priceType);
+  row.querySelector(".product-price-unit").value = row.dataset.priceUnit;
   setupBillingModeSelect(row, matched.billing_modes, row.querySelector(".product-billing-mode").value);
   row.dataset.noCommission = matched.no_commission ? "1" : "0";
   row.classList.remove("unmatched");
@@ -394,7 +415,9 @@ function setupProductSuggest(row) {
     panel.innerHTML = list.map((p, i) => {
       const scenario = catalog.scenarioById[p.scenario_id]?.label || "未分类";
       const isFixedPrice = normalizePriceType(p.price_type, p.name) === "fixed_price";
-      const discount = p.normal_discount || (isFixedPrice ? "未维护一口价" : "未维护折扣");
+      const discount = isFixedPrice
+        ? (formatFixedPrice(p.normal_discount, p.price_unit) || "未维护一口价")
+        : (p.normal_discount || "未维护折扣");
       const commission = p.no_commission ? "无返佣" : (p.normal_commission || "未维护返佣");
       return `<li role="option" data-id="${p.id}" class="${i === activeIdx ? "active" : ""}">
         <strong>${escapeHtml(p.name)}</strong>
@@ -630,8 +653,10 @@ function generateEmail() {
   let missingFields = 0;
   document.querySelectorAll(".product-row").forEach((row) => {
     const d = row.querySelector(".product-discount").value.trim();
+    const u = row.querySelector(".product-price-unit")?.value.trim() || "";
     const c = row.querySelector(".product-commission").value.trim();
-    if (!d || !c) {
+    const needsUnit = row.dataset.priceType === "fixed_price";
+    if (!d || !c || (needsUnit && !u)) {
       row.classList.add("incomplete");
       missingFields++;
     } else {
@@ -642,7 +667,9 @@ function generateEmail() {
     const commission = product.commission || "待填写返佣";
     const billing = billingModeLabel(product.billingMode);
     const priceLabel = priceTypeLabel(product.priceType);
-    const priceValue = product.discount || (product.priceType === "fixed_price" ? "待填写价格" : "待填写折扣");
+    const priceValue = product.priceType === "fixed_price"
+      ? (formatFixedPrice(product.discount, product.priceUnit) || "待填写价格")
+      : (product.discount || "待填写折扣");
     return `【申请产品${index + 1}】：产品名称/计费方式/${priceLabel}/返佣：${product.name || "待填写产品名称"}：${billing}/${priceValue}/${commission}`;
   });
 
@@ -650,7 +677,7 @@ function generateEmail() {
   const copyBodyBtn = document.getElementById("copyBodyButton");
   if (copyBodyBtn) {
     copyBodyBtn.disabled = missingFields > 0;
-    copyBodyBtn.title = missingFields > 0 ? `还有 ${missingFields} 行价格或返佣未填` : "";
+    copyBodyBtn.title = missingFields > 0 ? `还有 ${missingFields} 行价格、单位或返佣未填` : "";
   }
 
   emailSubject.value = `${fields.customerName.value.trim() || "客户"}${applicationLabel}--广州西骋`;
@@ -688,6 +715,7 @@ function addProduct(product = {}) {
   row.dataset.normalCommission = product.normal_commission || "";
   row.dataset.breakthroughDiscount = product.breakthrough_discount || "";
   row.dataset.breakthroughCommission = product.breakthrough_commission || "";
+  row.dataset.priceUnit = product.price_unit || "";
   row.dataset.priceType = normalizePriceType(product.price_type, product.name || "");
   setupProductPriceControls(row, row.dataset.priceType);
   setupBillingModeSelect(row, product.billing_modes, product.billingMode || "prepaid");
@@ -698,6 +726,7 @@ function addProduct(product = {}) {
   row.querySelector(".product-name").value = product.name || "";
   row.querySelector(".product-price-mode").value = product.priceMode || "default";
   row.querySelector(".product-discount").value = product.normal_discount || "";
+  row.querySelector(".product-price-unit").value = product.price_unit || "";
   row.querySelector(".product-commission").value = product.normal_commission || "";
 
   if (product.id) {

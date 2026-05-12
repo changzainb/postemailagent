@@ -397,7 +397,7 @@ textarea[readonly] {
 .product-header,
 .product-row {
   display: grid;
-  grid-template-columns: 44px minmax(240px, 1fr) 92px 112px 92px 112px 32px;
+  grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 82px 112px 32px;
   gap: 6px;
   align-items: center;
 }
@@ -432,6 +432,10 @@ textarea[readonly] {
 .product-row select {
   height: 30px;
   font-size: 13px;
+}
+
+.product-row:not(.fixed-price) .product-unit-field {
+  visibility: hidden;
 }
 
 .match-status {
@@ -585,8 +589,8 @@ textarea[readonly] {
   }
 
   .product-row {
-    grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 112px 32px;
-    min-width: 800px;
+    grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 82px 112px 32px;
+    min-width: 900px;
   }
 
   .product-index,
