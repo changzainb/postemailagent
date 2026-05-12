@@ -350,6 +350,7 @@ function setupProductSuggest(row) {
   const panel = row.querySelector(".product-suggest-panel");
   let activeIdx = -1;
   let currentList = [];
+  let pickingSuggestion = false;
 
   function render(list) {
     currentList = list;
@@ -402,6 +403,13 @@ function setupProductSuggest(row) {
     setMatchTag(row, "", "");
     open();
   });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (pickingSuggestion) return;
+      close();
+      matchProductName(row);
+    }, 120);
+  });
   input.addEventListener("keydown", (event) => {
     const items = currentList;
     if (event.key === "ArrowDown") {
@@ -423,12 +431,15 @@ function setupProductSuggest(row) {
       close();
     }
   });
-  panel.addEventListener("mousedown", (event) => {
+  panel.addEventListener("pointerdown", (event) => {
     const li = event.target.closest("li[data-id]");
     if (!li) return;
     event.preventDefault();
+    event.stopPropagation();
+    pickingSuggestion = true;
     const product = catalog.productById.get(Number(li.dataset.id));
     pick(product);
+    setTimeout(() => { pickingSuggestion = false; }, 0);
   });
   document.addEventListener("mousedown", (event) => {
     if (!combo.contains(event.target)) close();
@@ -671,7 +682,6 @@ function addProduct(product = {}) {
     generateEmail();
   });
   setupProductSuggest(row);
-  row.querySelector(".product-name").addEventListener("change", () => matchProductName(row));
   row.addEventListener("input", (event) => {
     if (!event.target.classList.contains("product-discount")) generateEmail();
   });
@@ -730,8 +740,9 @@ function resetProducts() {
 function applyScenario(scenarioKey = activeScenarioKey) {
   activeScenarioKey = scenarioKey;
   if (!scenarioKey || (Array.isArray(scenarioKey) && scenarioKey.length === 0)) {
-    matchStatus.textContent = "暂未匹配到场景，可手动新增产品。";
+    matchStatus.textContent = "未匹配到行业方案；可在下方产品名称输入点播、云点播、TRTC 等关键词选择产品。";
     productList.innerHTML = "";
+    addProduct();
     generateEmail();
     return;
   }
@@ -772,7 +783,7 @@ function suggestScenario() {
 function matchProducts() {
   const keys = findScenarioBundle();
   if (!keys.length) {
-    matchStatus.textContent = "暂未匹配到场景，可手动新增产品。";
+    matchStatus.textContent = "未匹配到行业方案；可在下方产品名称输入点播、云点播、TRTC 等关键词选择产品。";
     return;
   }
   if (productList.children.length > 0) {
@@ -879,5 +890,6 @@ document.getElementById("copyBodyButton").addEventListener("click", () => copyTe
   if (productList.children.length === 0) {
     const keys = findScenarioBundle();
     if (keys.length) applyScenario(keys);
+    else addProduct();
   }
 })();
