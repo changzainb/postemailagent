@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-price-unit">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-price-ux">
 </head>
 <body>
   <main class="app-shell">
@@ -78,8 +78,9 @@
             <span>序号</span>
             <span>产品名称</span>
             <span>计费方式</span>
-            <span>价格策略</span>
-            <span>价格 / 折扣</span>
+            <span>价格模式</span>
+            <span>政策类型</span>
+            <span>特批值</span>
             <span>单位</span>
             <span>返佣</span>
             <span></span>
@@ -172,17 +173,27 @@
         </select>
       </label>
       <label>
-        <span>价格策略</span>
-        <select class="product-price-mode">
-          <option value="default">常规政策</option>
-          <option value="breakthrough">突破政策</option>
-          <option value="original">原价</option>
-          <option value="manual">手动</option>
+        <span>价格模式</span>
+        <select class="product-price-type">
+          <option value="discount">折扣</option>
+          <option value="fixed_price">一口价</option>
         </select>
       </label>
       <label>
-        <span>价格 / 折扣</span>
-        <input class="product-discount" placeholder="例如：95折 或 0.357">
+        <span>政策类型</span>
+        <select class="product-price-mode">
+          <option value="default">常规特批</option>
+          <option value="breakthrough">突破特批</option>
+          <option value="original">原价</option>
+          <option value="manual">手动填写</option>
+        </select>
+      </label>
+      <label>
+        <span>特批值</span>
+        <div class="price-value-wrap">
+          <input class="product-discount" placeholder="例如：8">
+          <b class="price-fixed-suffix">折</b>
+        </div>
       </label>
       <label class="product-unit-field" hidden>
         <span>单位</span>
@@ -196,6 +207,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-price-unit"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-price-ux-unitcopy"></script>
 </body>
 </html>

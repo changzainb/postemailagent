@@ -397,7 +397,7 @@ textarea[readonly] {
 .product-header,
 .product-row {
   display: grid;
-  grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 82px 112px 32px;
+  grid-template-columns: 44px minmax(210px, 1fr) 92px 88px 106px 92px 82px 112px 32px;
   gap: 6px;
   align-items: center;
 }
@@ -419,13 +419,47 @@ textarea[readonly] {
   border-radius: 6px;
 }
 
-.product-row label span {
+.product-row label > span {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.price-value-wrap {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.price-value-wrap .product-discount {
+  border-radius: 6px 0 0 6px;
+}
+
+.price-fixed-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.product-row.fixed-price .price-value-wrap .product-discount {
+  border-radius: 6px;
+}
+
+.product-row.fixed-price .price-fixed-suffix {
+  display: none;
 }
 
 .product-row input,
@@ -589,8 +623,8 @@ textarea[readonly] {
   }
 
   .product-row {
-    grid-template-columns: 44px minmax(220px, 1fr) 92px 112px 92px 82px 112px 32px;
-    min-width: 900px;
+    grid-template-columns: 44px minmax(210px, 1fr) 92px 88px 106px 92px 82px 112px 32px;
+    min-width: 980px;
   }
 
   .product-index,

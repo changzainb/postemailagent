@@ -209,6 +209,7 @@ function normalizeCommission(value) {
 function parseDiscount(value) {
   const trimmed = (value || "").trim();
   if (trimmed === "原价") return 10;
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
   const match = trimmed.match(/(\d+(?:\.\d+)?)\s*折/);
   if (!match) return null;
   const discount = Number(match[1]);
@@ -238,7 +239,7 @@ function normalizePriceType(value, productName = "") {
 }
 
 function priceTypeLabel(value) {
-  return normalizePriceType(value) === "fixed_price" ? "价格" : "折扣";
+  return normalizePriceType(value) === "fixed_price" ? "特批一口价" : "特批折扣";
 }
 
 function formatFixedPrice(value, unit) {
@@ -249,21 +250,30 @@ function formatFixedPrice(value, unit) {
   return `${price}${suffix}`;
 }
 
+function stripDiscountSuffix(value) {
+  return String(value || "").trim().replace(/\s*折$/, "");
+}
+
+function formatDiscountValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text === "原价" || text.includes("折")) return text;
+  return `${text}折`;
+}
+
 function setupProductPriceControls(row, priceType = row.dataset.priceType || "discount") {
   const type = normalizePriceType(priceType, row.querySelector(".product-name")?.value || "");
   row.dataset.priceType = type;
   const select = row.querySelector(".product-price-mode");
+  const typeSelect = row.querySelector(".product-price-type");
   const priceInput = row.querySelector(".product-discount");
   const unitField = row.querySelector(".product-unit-field");
   const unitInput = row.querySelector(".product-price-unit");
   row.classList.toggle("fixed-price", type === "fixed_price");
-  if (select) {
-    select.querySelector('option[value="default"]').textContent = type === "fixed_price" ? "常规一口价" : "常规政策";
-    select.querySelector('option[value="breakthrough"]').textContent = type === "fixed_price" ? "突破一口价" : "突破政策";
-    select.querySelector('option[value="manual"]').textContent = type === "fixed_price" ? "手动价格" : "手动";
-  }
+  if (typeSelect) typeSelect.value = type;
+  if (select) select.querySelector('option[value="manual"]').textContent = type === "fixed_price" ? "手动单价" : "手动折扣";
   if (priceInput) {
-    priceInput.placeholder = type === "fixed_price" ? "例如：0.357 或 一口价说明" : "例如：95折";
+    priceInput.placeholder = type === "fixed_price" ? "例如：0.357" : "例如：8";
   }
   if (unitField && unitInput) {
     unitField.hidden = type !== "fixed_price";
@@ -292,11 +302,11 @@ function getProducts() {
   return Array.from(productList.querySelectorAll(".product-row")).map((row) => ({
     name: row.querySelector(".product-name").value.trim(),
     billingMode: row.querySelector(".product-billing-mode").value,
+    priceType: row.querySelector(".product-price-type")?.value || row.dataset.priceType || "discount",
     priceMode: row.querySelector(".product-price-mode").value,
     discount: row.querySelector(".product-discount").value.trim(),
     priceUnit: row.querySelector(".product-price-unit")?.value.trim() || "",
     commission: normalizeCommission(row.querySelector(".product-commission").value),
-    priceType: row.dataset.priceType || "discount",
     normalDiscount: row.dataset.normalDiscount || "",
     normalCommission: row.dataset.normalCommission || "",
     breakthroughDiscount: row.dataset.breakthroughDiscount || "",
@@ -316,12 +326,26 @@ function applyModeToRow(row, mode) {
     return;
   }
   if (mode === "breakthrough") {
-    row.querySelector(".product-discount").value = row.dataset.breakthroughDiscount || row.dataset.normalDiscount || "";
+    const value = row.dataset.breakthroughDiscount || row.dataset.normalDiscount || "";
+    row.querySelector(".product-discount").value = row.dataset.priceType === "fixed_price" ? value : stripDiscountSuffix(value);
     row.querySelector(".product-commission").value = row.dataset.breakthroughCommission || row.dataset.normalCommission || "";
     return;
   }
-  row.querySelector(".product-discount").value = row.dataset.normalDiscount || "";
+  row.querySelector(".product-discount").value = row.dataset.priceType === "fixed_price" ? row.dataset.normalDiscount || "" : stripDiscountSuffix(row.dataset.normalDiscount || "");
   row.querySelector(".product-commission").value = row.dataset.normalCommission || "";
+}
+
+function applyPriceTypeToRow(row, priceType, clearValues = true) {
+  const type = normalizePriceType(priceType);
+  row.dataset.priceType = type;
+  setupProductPriceControls(row, type);
+  if (!clearValues) return;
+  row.dataset.normalDiscount = "";
+  row.dataset.breakthroughDiscount = "";
+  row.querySelector(".product-discount").value = "";
+  row.querySelector(".product-price-unit").value = "";
+  row.querySelector(".product-price-mode").value = "manual";
+  generateEmail();
 }
 
 function setMatchTag(row, text, kind) {
@@ -668,9 +692,9 @@ function generateEmail() {
     const billing = billingModeLabel(product.billingMode);
     const priceLabel = priceTypeLabel(product.priceType);
     const priceValue = product.priceType === "fixed_price"
-      ? (formatFixedPrice(product.discount, product.priceUnit) || "待填写价格")
-      : (product.discount || "待填写折扣");
-    return `【申请产品${index + 1}】：产品名称/计费方式/${priceLabel}/返佣：${product.name || "待填写产品名称"}：${billing}/${priceValue}/${commission}`;
+      ? (product.discount ? (product.priceUnit ? formatFixedPrice(product.discount, product.priceUnit) : `${product.discount}（待填写单位）`) : "待填写价格")
+      : (formatDiscountValue(product.discount) || "待填写折扣");
+    return `【申请产品${index + 1}】：产品：${product.name || "待填写产品名称"}；计费方式：${billing}；申请类型：${priceLabel}；特批条件：${priceValue}；返佣：${commission}`;
   });
 
   // 复制按钮根据缺失情况禁用
@@ -724,8 +748,9 @@ function addProduct(product = {}) {
   if (product.id) row.dataset.productId = product.id;
 
   row.querySelector(".product-name").value = product.name || "";
+  row.querySelector(".product-price-type").value = row.dataset.priceType;
   row.querySelector(".product-price-mode").value = product.priceMode || "default";
-  row.querySelector(".product-discount").value = product.normal_discount || "";
+  row.querySelector(".product-discount").value = row.dataset.priceType === "fixed_price" ? product.normal_discount || "" : stripDiscountSuffix(product.normal_discount || "");
   row.querySelector(".product-price-unit").value = product.price_unit || "";
   row.querySelector(".product-commission").value = product.normal_commission || "";
 
@@ -743,6 +768,7 @@ function addProduct(product = {}) {
     generateEmail();
   });
   row.querySelector(".product-billing-mode").addEventListener("change", generateEmail);
+  row.querySelector(".product-price-type").addEventListener("change", (event) => applyPriceTypeToRow(row, event.target.value));
   row.querySelector(".product-discount").addEventListener("input", () => {
     row.querySelector(".product-price-mode").value = "manual";
     generateEmail();
