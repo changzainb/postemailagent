@@ -5,6 +5,8 @@ const state = {
   filterKeyword: '',
   selectedIds: new Set(),
   batchDeleteMode: false,
+  page: 1,
+  pageSize: 10,
 };
 
 const els = {
@@ -14,6 +16,10 @@ const els = {
   ruleBody: document.getElementById('ruleTableBody'),
   countText: document.getElementById('countText'),
   searchInput: document.getElementById('searchInput'),
+  pageSizeInput: document.getElementById('pageSizeInput'),
+  pageInfo: document.getElementById('pageInfo'),
+  prevPageBtn: document.getElementById('prevPageBtn'),
+  nextPageBtn: document.getElementById('nextPageBtn'),
   addBtn: document.getElementById('addProductBtn'),
   logoutBtn: document.getElementById('logoutBtn'),
   dialog: document.getElementById('productDialog'),
@@ -74,6 +80,7 @@ function renderScenarios() {
     li.addEventListener('click', () => {
       const value = li.dataset.id === '' ? null : Number(li.dataset.id);
       state.filterScenario = value;
+      state.page = 1;
       renderScenarios();
       renderProducts();
     });
@@ -101,26 +108,53 @@ function renderMissing(items) {
 
 function renderProducts() {
   const filtered = filteredProducts();
+  const totalPages = clampPage(filtered.length);
+  const pageItems = pagedProducts(filtered);
   // 把不在当前列表里的选中清掉，避免误删
   const visibleIds = new Set(filtered.map((p) => p.id));
   for (const id of [...state.selectedIds]) {
     if (!visibleIds.has(id)) state.selectedIds.delete(id);
   }
-  els.countText.textContent = `共 ${filtered.length} 个产品`;
+  const rangeStart = filtered.length ? (state.page - 1) * state.pageSize + 1 : 0;
+  const rangeEnd = filtered.length ? rangeStart + pageItems.length - 1 : 0;
+  els.countText.textContent = filtered.length
+    ? `共 ${filtered.length} 个产品 · 当前 ${rangeStart}-${rangeEnd}`
+    : '共 0 个产品';
   document.querySelector('.rule-table')?.classList.toggle('batch-mode', state.batchDeleteMode);
-  els.ruleBody.innerHTML = filtered.map(productRow).join('');
-  filtered.forEach((p) => bindRow(p.id));
-  syncSelectionUI(filtered);
+  els.ruleBody.innerHTML = pageItems.map(productRow).join('');
+  pageItems.forEach((p) => bindRow(p.id));
+  syncSelectionUI(filtered, pageItems, totalPages);
 }
 
-function syncSelectionUI(filtered) {
+function pageSizeValue() {
+  const n = Number(state.pageSize);
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(200, Math.max(1, Math.floor(n)));
+}
+
+function clampPage(totalItems) {
+  state.pageSize = pageSizeValue();
+  const totalPages = Math.max(1, Math.ceil(totalItems / state.pageSize));
+  if (!Number.isFinite(state.page) || state.page < 1) state.page = 1;
+  if (state.page > totalPages) state.page = totalPages;
+  return totalPages;
+}
+
+function pagedProducts(filtered) {
+  const start = (state.page - 1) * state.pageSize;
+  return filtered.slice(start, start + state.pageSize);
+}
+
+function syncSelectionUI(filtered, pageItems, totalPages) {
   const total = filtered.length;
+  const pageIds = pageItems.map((p) => p.id);
+  const pageSelected = pageIds.filter((id) => state.selectedIds.has(id)).length;
   const selected = state.selectedIds.size;
   const selectAll = document.getElementById('selectAll');
   if (selectAll) {
     selectAll.hidden = !state.batchDeleteMode;
-    selectAll.checked = total > 0 && selected === total;
-    selectAll.indeterminate = selected > 0 && selected < total;
+    selectAll.checked = pageIds.length > 0 && pageSelected === pageIds.length;
+    selectAll.indeterminate = pageSelected > 0 && pageSelected < pageIds.length;
   }
   const btn = document.getElementById('batchDeleteBtn');
   if (btn) {
@@ -132,6 +166,12 @@ function syncSelectionUI(filtered) {
   const cancelBtn = document.getElementById('batchCancelBtn');
   if (cancelBtn) cancelBtn.hidden = !state.batchDeleteMode;
   document.querySelector('.toolbar')?.classList.toggle('batch-active', state.batchDeleteMode);
+  if (els.pageInfo) els.pageInfo.textContent = `第 ${state.page} / ${totalPages} 页`;
+  if (els.prevPageBtn) els.prevPageBtn.disabled = state.page <= 1;
+  if (els.nextPageBtn) els.nextPageBtn.disabled = state.page >= totalPages || total === 0;
+  if (els.pageSizeInput && Number(els.pageSizeInput.value) !== state.pageSize) {
+    els.pageSizeInput.value = String(state.pageSize);
+  }
 }
 
 function normalizeBillingModes(modes) {
@@ -243,7 +283,7 @@ function bindRow(productId) {
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) state.selectedIds.add(productId);
       else state.selectedIds.delete(productId);
-      syncSelectionUI(filteredProducts());
+      renderProducts();
     });
   }
   row.querySelector('[data-action="enter-edit"]').addEventListener('click', () => setRowEditing(row, true));
@@ -417,6 +457,7 @@ els.addBtn.addEventListener('click', openCreateDialog);
 document.getElementById('dlgCancel').addEventListener('click', () => els.dialog.close('cancel'));
 els.searchInput.addEventListener('input', (event) => {
   state.filterKeyword = event.target.value;
+  state.page = 1;
   renderProducts();
 });
 els.logoutBtn.addEventListener('click', async () => {
@@ -430,7 +471,7 @@ document.getElementById('changeLogBtn')?.addEventListener('click', () => {
 
 document.getElementById('selectAll')?.addEventListener('change', (e) => {
   if (!state.batchDeleteMode) return;
-  const list = filteredProducts();
+  const list = pagedProducts(filteredProducts());
   if (e.target.checked) list.forEach((p) => state.selectedIds.add(p.id));
   else list.forEach((p) => state.selectedIds.delete(p.id));
   renderProducts();
@@ -438,6 +479,40 @@ document.getElementById('selectAll')?.addEventListener('change', (e) => {
 
 document.getElementById('batchDeleteBtn')?.addEventListener('click', batchDelete);
 document.getElementById('batchCancelBtn')?.addEventListener('click', cancelBatchDelete);
+els.prevPageBtn?.addEventListener('click', () => {
+  if (state.page <= 1) return;
+  state.page -= 1;
+  renderProducts();
+});
+els.nextPageBtn?.addEventListener('click', () => {
+  const totalPages = Math.max(1, Math.ceil(filteredProducts().length / pageSizeValue()));
+  if (state.page >= totalPages) return;
+  state.page += 1;
+  renderProducts();
+});
+els.pageSizeInput?.addEventListener('change', () => {
+  state.pageSize = pageSizeValueFromInput();
+  state.page = 1;
+  renderProducts();
+});
+els.pageSizeInput?.addEventListener('blur', () => {
+  state.pageSize = pageSizeValueFromInput();
+  els.pageSizeInput.value = String(state.pageSize);
+});
+els.pageSizeInput?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  state.pageSize = pageSizeValueFromInput();
+  state.page = 1;
+  els.pageSizeInput.value = String(state.pageSize);
+  renderProducts();
+});
+
+function pageSizeValueFromInput() {
+  const raw = Number(els.pageSizeInput?.value);
+  if (!Number.isFinite(raw)) return 10;
+  return Math.min(200, Math.max(1, Math.floor(raw)));
+}
 
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({
