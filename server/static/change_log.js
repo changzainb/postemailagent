@@ -1,4 +1,4 @@
-// 变更记录弹窗：两个 tab — 规则变更 / 行业匹配变更
+// 变更记录弹窗：规则变更 / 产品类型变更 / 行业匹配变更
 // 用法：在页面里调 ChangeLog.open()；首次调用会自动注入 dialog
 (function () {
   const FIELD_LABELS = {
@@ -41,6 +41,7 @@
         <strong>变更记录</strong>
         <div class="cl-tabs">
           <button class="cl-tab active" data-tab="rule">规则变更</button>
+          <button class="cl-tab" data-tab="type">产品类型变更</button>
           <button class="cl-tab" data-tab="industry">行业匹配变更</button>
         </div>
         <button class="cl-close" title="关闭">×</button>
@@ -86,7 +87,9 @@
       currentTab = tab;
       dlg.querySelectorAll(".cl-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
       $("clIndustryFilter").hidden = tab !== "industry";
-      $("clHint").textContent = tab === "rule" ? "最近 200 条规则变更" : "最近 100 条行业匹配变更";
+      $("clHint").textContent = tab === "rule"
+        ? "最近 200 条规则变更"
+        : (tab === "type" ? "最近 100 条产品类型变更" : "最近 100 条行业匹配变更");
       load();
     }
 
@@ -97,6 +100,10 @@
         const resp = await fetch("/api/rule-history").then((r) => r.json()).catch(() => ({ code: -1 }));
         if (resp.code !== 0) { body.innerHTML = `<div class="cl-empty">加载失败（需要 admin 权限）</div>`; return; }
         renderRule(resp.data || []);
+      } else if (currentTab === "type") {
+        const resp = await fetch("/api/scenarios/change-log").then((r) => r.json()).catch(() => ({ code: -1 }));
+        if (resp.code !== 0) { body.innerHTML = `<div class="cl-empty">加载失败（需要 admin 权限）</div>`; return; }
+        renderType(resp.data || []);
       } else {
         const key = $("clIndustryFilter").value;
         const url = "/api/industries/change-log" + (key ? `?industry_key=${encodeURIComponent(key)}` : "");
@@ -142,6 +149,32 @@
           </div>
           ${tag("新增", "cl-add", it.added || [])}
           ${tag("移除", "cl-del", it.removed || [])}
+        </div>`;
+      }).join("");
+    }
+
+    function renderType(list) {
+      if (!list.length) { $("clBody").innerHTML = `<div class="cl-empty">暂无产品类型变更</div>`; return; }
+      const actionMap = { create: "新增", update: "修改", delete: "删除" };
+      $("clBody").innerHTML = list.map((it) => {
+        const before = it.before || {};
+        const after = it.after || {};
+        let bodyHtml = "";
+        if (it.action === "create") {
+          bodyHtml = `<div class="cl-diff-row"><span class="cl-diff-key">名称</span><span><span class="cl-to">${esc(after.label || "—")}</span></span></div>`;
+        } else if (it.action === "update") {
+          bodyHtml = `<div class="cl-diff-row"><span class="cl-diff-key">名称</span><span><span class="cl-from">${esc(before.label || "—")}</span>→<span class="cl-to" style="margin-left:6px;">${esc(after.label || "—")}</span></span></div>`;
+        } else {
+          bodyHtml = `
+            <div class="cl-diff-row"><span class="cl-diff-key">删除</span><span><span class="cl-from">${esc(before.label || "—")}</span></span></div>
+            <div class="cl-diff-row"><span class="cl-diff-key">产品转移</span><span>${esc(before.product_count || 0)} 个 → ${esc(after.moved_to || "—")}</span></div>`;
+        }
+        return `<div class="cl-item">
+          <div class="cl-item-head">
+            <span><strong>${esc(before.label || after.label || it.type_key || `类型#${it.type_id}`)}</strong> · ${esc(it.actor || "系统")} · ${actionMap[it.action] || it.action}</span>
+            <span>${fmtTime(it.created_at)}</span>
+          </div>
+          ${bodyHtml}
         </div>`;
       }).join("");
     }

@@ -126,6 +126,37 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   color: #344054;
 }
+.scenario-list li { gap: 6px; }
+.scenario-list li .type-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.type-actions {
+  display: inline-flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.scenario-list li:hover .type-actions { opacity: 1; }
+.type-actions button {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+}
+.type-actions button:hover { color: #111827; background: #f8fafc; }
+.add-product-wide {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
 .scenario-list li:hover, .missing-list li:hover { background: var(--panel-strong); }
 .scenario-list li.active { background: #eaf2fa; color: var(--accent-dark); font-weight: 600; }
 .scenario-list li .badge {

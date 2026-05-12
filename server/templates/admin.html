@@ -23,14 +23,11 @@
   <main class="admin-shell">
     <aside class="sidebar">
       <div class="sidebar-head">
-        <span>场景</span>
-        <button class="primary small" id="addProductBtn">+ 新增产品</button>
+        <span>产品类型</span>
+        <button class="primary small" id="addTypeBtn">+ 类型</button>
       </div>
       <ul class="scenario-list" id="scenarioList"></ul>
-      <div class="sidebar-section">
-        <div class="sidebar-head"><span>销售上报缺失</span></div>
-        <ul class="missing-list" id="missingList"><li class="muted">暂无</li></ul>
-      </div>
+      <button class="ghost add-product-wide" id="addProductBtn">+ 新增产品</button>
     </aside>
 
     <section class="content">
@@ -90,7 +87,7 @@
         <input id="dlgName" required>
       </label>
       <label>
-        <span>所属场景</span>
+        <span>所属产品类型</span>
         <select id="dlgScenario" required></select>
       </label>
       <label>

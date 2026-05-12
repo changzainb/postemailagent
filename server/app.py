@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
@@ -87,6 +88,143 @@ def create_app():
             "SELECT id, key, label, sort_order FROM scenarios ORDER BY sort_order, id"
         ).fetchall()
         return jsonify({"code": 0, "data": [dict(row) for row in rows]})
+
+    def _scenario_log(db, type_id, type_key, action, before=None, after=None):
+        user = current_user() or {}
+        db.execute(
+            "INSERT INTO product_type_change_log(type_id, type_key, action, before, after, actor) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                type_id,
+                type_key,
+                action,
+                json.dumps(before or {}, ensure_ascii=False, default=str),
+                json.dumps(after or {}, ensure_ascii=False, default=str),
+                user.get("username", ""),
+            ),
+        )
+
+    def _ensure_scenario_key(db):
+        return f"type_{int(time.time() * 1000)}"
+
+    def _ensure_fallback_scenario(db, deleting_id):
+        row = db.execute(
+            "SELECT id, key, label FROM scenarios WHERE id<>? AND (key='other' OR label='其他 / 待归类') "
+            "ORDER BY CASE WHEN key='other' THEN 0 ELSE 1 END, id LIMIT 1",
+            (deleting_id,),
+        ).fetchone()
+        if row:
+            return row
+        order_row = db.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS o FROM scenarios").fetchone()
+        key = f"fallback_{int(time.time() * 1000)}"
+        cur = db.execute(
+            "INSERT INTO scenarios(key, label, sort_order) VALUES (?, ?, ?)",
+            (key, "其他 / 待归类", order_row["o"]),
+        )
+        return db.execute("SELECT id, key, label FROM scenarios WHERE id=?", (cur.lastrowid,)).fetchone()
+
+    @app.post("/api/scenarios")
+    @require_role("admin")
+    def api_scenarios_create():
+        body = request.get_json(silent=True) or {}
+        label = (body.get("label") or "").strip()
+        if not label:
+            return jsonify({"code": 400, "msg": "产品类型名称不能为空"}), 400
+        if body.get("confirm") is not True:
+            return jsonify({"code": 400, "msg": "请确认后再新增产品类型"}), 400
+        db = get_db()
+        if db.execute("SELECT id FROM scenarios WHERE label=?", (label,)).fetchone():
+            return jsonify({"code": 409, "msg": "该产品类型已存在"}), 409
+        order_row = db.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS o FROM scenarios").fetchone()
+        key = _ensure_scenario_key(db)
+        try:
+            cur = db.execute(
+                "INSERT INTO scenarios(key, label, sort_order) VALUES (?, ?, ?)",
+                (key, label, order_row["o"]),
+            )
+            _scenario_log(db, cur.lastrowid, key, "create", after={"label": label})
+            db.commit()
+        except sqlite3.IntegrityError:
+            db.rollback()
+            return jsonify({"code": 409, "msg": "产品类型创建冲突，请重试"}), 409
+        return jsonify({"code": 0, "data": {"id": cur.lastrowid, "key": key, "label": label}})
+
+    @app.put("/api/scenarios/<int:scenario_id>")
+    @require_role("admin")
+    def api_scenarios_update(scenario_id):
+        body = request.get_json(silent=True) or {}
+        label = (body.get("label") or "").strip()
+        if not label:
+            return jsonify({"code": 400, "msg": "产品类型名称不能为空"}), 400
+        if body.get("confirm") is not True:
+            return jsonify({"code": 400, "msg": "请确认后再修改产品类型"}), 400
+        db = get_db()
+        old = db.execute("SELECT id, key, label, sort_order FROM scenarios WHERE id=?", (scenario_id,)).fetchone()
+        if not old:
+            return jsonify({"code": 404, "msg": "产品类型不存在"}), 404
+        duplicate = db.execute("SELECT id FROM scenarios WHERE label=? AND id<>?", (label, scenario_id)).fetchone()
+        if duplicate:
+            return jsonify({"code": 409, "msg": "该产品类型已存在"}), 409
+        if old["label"] == label:
+            return jsonify({"code": 0, "data": {"changed": False}})
+        db.execute("UPDATE scenarios SET label=? WHERE id=?", (label, scenario_id))
+        _scenario_log(
+            db,
+            scenario_id,
+            old["key"],
+            "update",
+            before={"label": old["label"]},
+            after={"label": label},
+        )
+        db.commit()
+        return jsonify({"code": 0, "data": {"changed": True}})
+
+    @app.delete("/api/scenarios/<int:scenario_id>")
+    @require_role("admin")
+    def api_scenarios_delete(scenario_id):
+        body = request.get_json(silent=True) or {}
+        if body.get("confirm") is not True:
+            return jsonify({"code": 400, "msg": "请确认后再删除产品类型"}), 400
+        db = get_db()
+        old = db.execute("SELECT id, key, label, sort_order FROM scenarios WHERE id=?", (scenario_id,)).fetchone()
+        if not old:
+            return jsonify({"code": 404, "msg": "产品类型不存在"}), 404
+        product_count = db.execute("SELECT COUNT(*) AS c FROM products WHERE scenario_id=?", (scenario_id,)).fetchone()["c"]
+        fallback = _ensure_fallback_scenario(db, scenario_id)
+        try:
+            if product_count:
+                db.execute("UPDATE products SET scenario_id=?, updated_at=CURRENT_TIMESTAMP WHERE scenario_id=?", (fallback["id"], scenario_id))
+            db.execute("DELETE FROM scenarios WHERE id=?", (scenario_id,))
+            _scenario_log(
+                db,
+                scenario_id,
+                old["key"],
+                "delete",
+                before={"label": old["label"], "product_count": product_count},
+                after={"moved_to": fallback["label"], "moved_to_id": fallback["id"]},
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            return jsonify({"code": 500, "msg": f"删除失败：{exc}"}), 500
+        return jsonify({"code": 0, "data": {"deleted": scenario_id, "moved_products": product_count, "moved_to": fallback["label"]}})
+
+    @app.get("/api/scenarios/change-log")
+    @require_role("admin")
+    def api_scenarios_change_log():
+        limit = min(int(request.args.get("limit", 100) or 100), 500)
+        rows = get_db().execute(
+            "SELECT id, type_id, type_key, action, before, after, actor, created_at "
+            "FROM product_type_change_log ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        data = []
+        for r in rows:
+            d = dict(r)
+            d["before"] = json.loads(d.get("before") or "{}")
+            d["after"] = json.loads(d.get("after") or "{}")
+            data.append(d)
+        return jsonify({"code": 0, "data": data})
 
     # ------- Products -------
     @app.get("/api/products")

@@ -7,12 +7,12 @@ const state = {
   batchDeleteMode: false,
   page: 1,
   pageSize: 10,
+  userRole: '',
 };
 
 const els = {
   userInfo: document.getElementById('userInfo'),
   scenarioList: document.getElementById('scenarioList'),
-  missingList: document.getElementById('missingList'),
   ruleBody: document.getElementById('ruleTableBody'),
   countText: document.getElementById('countText'),
   searchInput: document.getElementById('searchInput'),
@@ -20,6 +20,7 @@ const els = {
   pageInfo: document.getElementById('pageInfo'),
   prevPageBtn: document.getElementById('prevPageBtn'),
   nextPageBtn: document.getElementById('nextPageBtn'),
+  addTypeBtn: document.getElementById('addTypeBtn'),
   addBtn: document.getElementById('addProductBtn'),
   logoutBtn: document.getElementById('logoutBtn'),
   dialog: document.getElementById('productDialog'),
@@ -52,16 +53,16 @@ async function bootstrap() {
     return;
   }
   els.userInfo.textContent = `${me.data.username} · ${me.data.role}`;
-  const [scenariosResp, productsResp, missingResp] = await Promise.all([
+  state.userRole = me.data.role || '';
+  if (els.addTypeBtn) els.addTypeBtn.hidden = state.userRole !== 'admin';
+  const [scenariosResp, productsResp] = await Promise.all([
     fetchJson('/api/scenarios'),
     fetchJson('/api/products?status=active'),
-    fetchJson('/api/match/missing'),
   ]);
   state.scenarios = scenariosResp.data || [];
   state.products = productsResp.data || [];
   renderScenarios();
   renderProducts();
-  renderMissing(missingResp.data || []);
   populateScenarioOptions();
 }
 
@@ -76,7 +77,7 @@ function renderScenarios() {
     items.push(scenarioItem(s.id, s.label, counts.get(s.id) || 0));
   }
   els.scenarioList.innerHTML = items.join('');
-  els.scenarioList.querySelectorAll('li').forEach((li) => {
+  els.scenarioList.querySelectorAll('li[data-id]').forEach((li) => {
     li.addEventListener('click', () => {
       const value = li.dataset.id === '' ? null : Number(li.dataset.id);
       state.filterScenario = value;
@@ -85,25 +86,69 @@ function renderScenarios() {
       renderProducts();
     });
   });
+  els.scenarioList.querySelectorAll('[data-type-action]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const id = Number(btn.closest('li').dataset.id);
+      if (btn.dataset.typeAction === 'rename') renameType(id);
+      if (btn.dataset.typeAction === 'delete') deleteType(id);
+    });
+  });
 }
 
 function scenarioItem(id, label, count) {
   const active = (id === state.filterScenario) ? ' active' : '';
+  const actions = id == null || state.userRole !== 'admin' ? '' : `<span class="type-actions">
+    <button type="button" data-type-action="rename" title="修改产品类型名称">改</button>
+    <button type="button" data-type-action="delete" title="删除产品类型">删</button>
+  </span>`;
   return `<li class="${active.trim()}" data-id="${id ?? ''}">
-    <span>${escapeHtml(label)}</span><span class="badge">${count}</span>
+    <span class="type-name">${escapeHtml(label)}</span><span class="badge">${count}</span>${actions}
   </li>`;
 }
 
-function renderMissing(items) {
-  if (!items.length) {
-    els.missingList.innerHTML = '<li class="muted">暂无</li>';
-    return;
+async function createType() {
+  const label = (prompt('新增产品类型名称') || '').trim();
+  if (!label) return;
+  if (!confirm(`确认新增产品类型「${label}」？`)) return;
+  const resp = await fetchJson('/api/scenarios', {
+    method: 'POST',
+    body: JSON.stringify({label, confirm: true}),
+  });
+  if (resp.code === 0) await refreshCatalog();
+  else alert(resp.msg || '新增失败');
+}
+
+async function renameType(id) {
+  const item = state.scenarios.find((s) => s.id === id);
+  if (!item) return;
+  const label = (prompt('修改产品类型名称', item.label) || '').trim();
+  if (!label || label === item.label) return;
+  if (!confirm(`确认把「${item.label}」改为「${label}」？`)) return;
+  const resp = await fetchJson(`/api/scenarios/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({label, confirm: true}),
+  });
+  if (resp.code === 0) await refreshCatalog();
+  else alert(resp.msg || '修改失败');
+}
+
+async function deleteType(id) {
+  const item = state.scenarios.find((s) => s.id === id);
+  if (!item) return;
+  const count = state.products.filter((p) => p.scenario_id === id).length;
+  if (!confirm(`确认删除产品类型「${item.label}」？`)) return;
+  if (!confirm(`再次确认删除「${item.label}」。该类型下 ${count} 个产品会转到「其他 / 待归类」，操作会写入变更记录。`)) return;
+  const resp = await fetchJson(`/api/scenarios/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({confirm: true}),
+  });
+  if (resp.code === 0) {
+    if (state.filterScenario === id) state.filterScenario = null;
+    await refreshCatalog();
+  } else {
+    alert(resp.msg || '删除失败');
   }
-  els.missingList.innerHTML = items.slice(0, 30).map((item) =>
-    `<li title="${escapeHtml(item.raw_name)}">
-      <span>${escapeHtml(truncate(item.raw_name, 18))}</span>
-    </li>`
-  ).join('');
 }
 
 function renderProducts() {
@@ -258,7 +303,7 @@ function productRow(p) {
       <button class="ghost small" data-action="enter-edit" title="编辑这一行">编辑</button>
       <button class="primary small" data-action="save" title="保存改动" hidden>保存</button>
       <button class="ghost small" data-action="cancel-edit" title="放弃改动" hidden>取消</button>
-      <button class="icon-btn" data-action="meta" title="改产品名/场景/别名">改</button>
+      <button class="icon-btn" data-action="meta" title="改产品名/产品类型/别名">改</button>
       <button class="icon-btn danger" data-action="delete" title="删除产品">删</button>
     </td>
   </tr>`;
@@ -407,6 +452,19 @@ async function refreshProducts() {
   renderProducts();
 }
 
+async function refreshCatalog() {
+  const [scenariosResp, productsResp] = await Promise.all([
+    fetchJson('/api/scenarios'),
+    fetchJson('/api/products?status=active'),
+  ]);
+  state.scenarios = scenariosResp.data || [];
+  state.products = productsResp.data || [];
+  state.page = 1;
+  renderScenarios();
+  renderProducts();
+  populateScenarioOptions();
+}
+
 function populateScenarioOptions() {
   els.dlgScenario.innerHTML = state.scenarios.map((s) =>
     `<option value="${s.id}">${escapeHtml(s.label)}</option>`
@@ -454,6 +512,7 @@ els.dlgForm.addEventListener('submit', async (event) => {
 });
 
 els.addBtn.addEventListener('click', openCreateDialog);
+els.addTypeBtn?.addEventListener('click', createType);
 document.getElementById('dlgCancel').addEventListener('click', () => els.dialog.close('cancel'));
 els.searchInput.addEventListener('input', (event) => {
   state.filterKeyword = event.target.value;

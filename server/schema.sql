@@ -7,6 +7,19 @@ CREATE TABLE IF NOT EXISTS scenarios (
   sort_order  INTEGER DEFAULT 0
 );
 
+-- 产品类型变更日志（后台维护）
+CREATE TABLE IF NOT EXISTS product_type_change_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  type_id     INTEGER,
+  type_key    TEXT,
+  action      TEXT NOT NULL,
+  before      TEXT DEFAULT '{}',
+  after       TEXT DEFAULT '{}',
+  actor       TEXT,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_type_log_time ON product_type_change_log(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS products (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   scenario_id     INTEGER NOT NULL REFERENCES scenarios(id),
