@@ -8,6 +8,8 @@ const state = {
   page: 1,
   pageSize: 10,
   userRole: '',
+  draggedScenarioId: null,
+  suppressScenarioClick: false,
 };
 
 const els = {
@@ -79,6 +81,10 @@ function renderScenarios() {
   els.scenarioList.innerHTML = items.join('');
   els.scenarioList.querySelectorAll('li[data-id]').forEach((li) => {
     li.addEventListener('click', () => {
+      if (state.suppressScenarioClick) {
+        state.suppressScenarioClick = false;
+        return;
+      }
       const value = li.dataset.id === '' ? null : Number(li.dataset.id);
       state.filterScenario = value;
       state.page = 1;
@@ -94,17 +100,81 @@ function renderScenarios() {
       if (btn.dataset.typeAction === 'delete') deleteType(id);
     });
   });
+  bindScenarioDragSort();
 }
 
 function scenarioItem(id, label, count) {
   const active = (id === state.filterScenario) ? ' active' : '';
+  const drag = id == null || state.userRole !== 'admin' ? '' : '<button type="button" class="drag-handle" data-drag-handle draggable="true" title="拖动调整排序" aria-label="拖动调整产品类型排序"></button>';
   const actions = id == null || state.userRole !== 'admin' ? '' : `<span class="type-actions">
-    <button type="button" data-type-action="rename" title="修改产品类型名称">改</button>
-    <button type="button" data-type-action="delete" title="删除产品类型">删</button>
+    <button type="button" class="type-action-btn type-action-rename" data-type-action="rename" title="修改产品类型名称" aria-label="修改产品类型名称"></button>
+    <button type="button" class="type-action-btn type-action-delete" data-type-action="delete" title="删除产品类型" aria-label="删除产品类型"></button>
   </span>`;
   return `<li class="${active.trim()}" data-id="${id ?? ''}">
-    <span class="type-name">${escapeHtml(label)}</span><span class="badge">${count}</span>${actions}
+    ${drag}<span class="type-name">${escapeHtml(label)}</span><span class="badge">${count}</span>${actions}
   </li>`;
+}
+
+function bindScenarioDragSort() {
+  if (state.userRole !== 'admin') return;
+  els.scenarioList.querySelectorAll('li[data-id]:not([data-id=""])').forEach((li) => {
+    const handle = li.querySelector('[data-drag-handle]');
+    if (!handle) return;
+    handle.addEventListener('click', (event) => event.stopPropagation());
+    handle.addEventListener('dragstart', (event) => {
+      event.stopPropagation();
+      state.draggedScenarioId = Number(li.dataset.id);
+      li.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', li.dataset.id);
+    });
+    handle.addEventListener('dragend', (event) => {
+      event.stopPropagation();
+      li.classList.remove('dragging');
+      els.scenarioList.querySelectorAll('.drag-over').forEach((item) => item.classList.remove('drag-over'));
+      state.draggedScenarioId = null;
+      setTimeout(() => { state.suppressScenarioClick = false; }, 0);
+    });
+    li.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      if (!state.draggedScenarioId || Number(li.dataset.id) === state.draggedScenarioId) return;
+      li.classList.add('drag-over');
+      event.dataTransfer.dropEffect = 'move';
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+    li.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      li.classList.remove('drag-over');
+      const fromId = state.draggedScenarioId || Number(event.dataTransfer.getData('text/plain'));
+      const toId = Number(li.dataset.id);
+      if (!fromId || !toId || fromId === toId) return;
+      state.suppressScenarioClick = true;
+      await reorderScenarios(fromId, toId);
+    });
+  });
+}
+
+async function reorderScenarios(fromId, toId) {
+  const next = [...state.scenarios];
+  const fromIndex = next.findIndex((s) => s.id === fromId);
+  const toIndex = next.findIndex((s) => s.id === toId);
+  if (fromIndex < 0 || toIndex < 0) return;
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  const previous = state.scenarios;
+  state.scenarios = next;
+  renderScenarios();
+  const resp = await fetchJson('/api/scenarios/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ids: next.map((s) => s.id)}),
+  });
+  if (resp.code === 0) {
+    await refreshCatalog();
+  } else {
+    state.scenarios = previous;
+    renderScenarios();
+    alert(resp.msg || '排序保存失败');
+  }
 }
 
 async function createType() {

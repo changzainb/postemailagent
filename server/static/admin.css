@@ -127,6 +127,46 @@ a:hover { text-decoration: underline; }
   color: #344054;
 }
 .scenario-list li { gap: 6px; }
+.scenario-list li.dragging {
+  opacity: 0.55;
+  background: #eef6ff;
+}
+.scenario-list li.drag-over {
+  box-shadow: inset 0 2px 0 var(--accent);
+  background: #f5faff;
+}
+.drag-handle {
+  flex: 0 0 auto;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  cursor: grab;
+  opacity: 0.7;
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.drag-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  background-image: radial-gradient(circle, #94a3b8 1.4px, transparent 1.6px);
+  background-size: 7px 6px;
+  background-position: 0 0;
+}
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  border-color: #d8e0ea;
+  background: #f1f5f9;
+  opacity: 1;
+}
+.drag-handle:active { cursor: grabbing; }
 .scenario-list li .type-name {
   flex: 1;
   min-width: 0;
@@ -141,17 +181,55 @@ a:hover { text-decoration: underline; }
   transition: opacity 0.12s ease;
 }
 .scenario-list li:hover .type-actions { opacity: 1; }
-.type-actions button {
-  width: 24px;
-  height: 22px;
+.type-action-btn {
+  position: relative;
+  width: 26px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #fff;
   color: #64748b;
-  font-size: 12px;
 }
-.type-actions button:hover { color: #111827; background: #f8fafc; }
+.type-action-btn::before,
+.type-action-btn::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.type-action-rename::before {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(-35deg);
+}
+.type-action-rename::after {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(2px, -7px) rotate(-35deg);
+}
+.type-action-delete::before {
+  width: 10px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-top: none;
+  border-radius: 0 0 2px 2px;
+  transform: translate(-50%, -35%);
+}
+.type-action-delete::after {
+  width: 12px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: translate(-50%, -8px);
+}
+.type-action-btn:hover { color: #111827; background: #f8fafc; }
+.type-action-delete:hover { color: var(--danger); background: #fff4f3; }
 .add-product-wide {
   width: 100%;
   justify-content: center;

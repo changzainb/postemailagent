@@ -179,6 +179,46 @@ def create_app():
         db.commit()
         return jsonify({"code": 0, "data": {"changed": True}})
 
+    @app.put("/api/scenarios/reorder")
+    @require_role("admin")
+    def api_scenarios_reorder():
+        body = request.get_json(silent=True) or {}
+        ids = body.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            return jsonify({"code": 400, "msg": "ids 必须是非空数组"}), 400
+        try:
+            ids = [int(x) for x in ids]
+        except (TypeError, ValueError):
+            return jsonify({"code": 400, "msg": "ids 只能包含产品类型 ID"}), 400
+        if len(ids) != len(set(ids)):
+            return jsonify({"code": 400, "msg": "ids 不能重复"}), 400
+        db = get_db()
+        rows = db.execute("SELECT id, key, label, sort_order FROM scenarios ORDER BY sort_order, id").fetchall()
+        existing_ids = [row["id"] for row in rows]
+        if set(ids) != set(existing_ids):
+            return jsonify({"code": 400, "msg": "排序数据和当前产品类型不一致，请刷新后重试"}), 400
+        before = [{"id": row["id"], "label": row["label"]} for row in rows]
+        label_map = {row["id"]: row["label"] for row in rows}
+        after = [{"id": sid, "label": label_map.get(sid, f"#{sid}")} for sid in ids]
+        if existing_ids == ids:
+            return jsonify({"code": 0, "data": {"changed": False}})
+        try:
+            for index, scenario_id in enumerate(ids):
+                db.execute("UPDATE scenarios SET sort_order=? WHERE id=?", (index, scenario_id))
+            _scenario_log(
+                db,
+                None,
+                "__reorder__",
+                "reorder",
+                before={"order": before},
+                after={"order": after},
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            return jsonify({"code": 500, "msg": f"排序保存失败：{exc}"}), 500
+        return jsonify({"code": 0, "data": {"changed": True}})
+
     @app.delete("/api/scenarios/<int:scenario_id>")
     @require_role("admin")
     def api_scenarios_delete(scenario_id):

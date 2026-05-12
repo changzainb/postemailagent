@@ -158,7 +158,7 @@
 
     function renderType(list) {
       if (!list.length) { $("clBody").innerHTML = `<div class="cl-empty">暂无产品类型变更</div>`; return; }
-      const actionMap = { create: "新增", update: "修改", delete: "删除" };
+      const actionMap = { create: "新增", update: "修改", delete: "删除", reorder: "排序" };
       $("clBody").innerHTML = list.map((it) => {
         const before = it.before || {};
         const after = it.after || {};
@@ -167,6 +167,12 @@
           bodyHtml = `<div class="cl-diff-row"><span class="cl-diff-key">名称</span><span><span class="cl-to">${esc(after.label || "—")}</span></span></div>`;
         } else if (it.action === "update") {
           bodyHtml = `<div class="cl-diff-row"><span class="cl-diff-key">名称</span><span><span class="cl-from">${esc(before.label || "—")}</span>→<span class="cl-to" style="margin-left:6px;">${esc(after.label || "—")}</span></span></div>`;
+        } else if (it.action === "reorder") {
+          const beforeOrder = (before.order || []).map((i) => i.label).join(" → ");
+          const afterOrder = (after.order || []).map((i) => i.label).join(" → ");
+          bodyHtml = `
+            <div class="cl-diff-row"><span class="cl-diff-key">调整前</span><span>${esc(beforeOrder || "—")}</span></div>
+            <div class="cl-diff-row"><span class="cl-diff-key">调整后</span><span>${esc(afterOrder || "—")}</span></div>`;
         } else {
           bodyHtml = `
             <div class="cl-diff-row"><span class="cl-diff-key">删除</span><span><span class="cl-from">${esc(before.label || "—")}</span></span></div>
@@ -174,7 +180,7 @@
         }
         return `<div class="cl-item">
           <div class="cl-item-head">
-            <span><strong>${esc(before.label || after.label || it.type_key || `类型#${it.type_id}`)}</strong> · ${esc(it.actor || "系统")} · ${actionMap[it.action] || it.action}</span>
+            <span><strong>${esc(before.label || after.label || (it.action === "reorder" ? "产品类型顺序" : it.type_key) || `类型#${it.type_id}`)}</strong> · ${esc(it.actor || "系统")} · ${actionMap[it.action] || it.action}</span>
             <span>${fmtTime(it.created_at)}</span>
           </div>
           ${bodyHtml}

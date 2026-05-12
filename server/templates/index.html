@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-price-ux">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-ui-polish">
 </head>
 <body>
   <main class="app-shell">
@@ -78,10 +78,10 @@
             <span>序号</span>
             <span>产品名称</span>
             <span>计费方式</span>
-            <span>价格模式</span>
-            <span>政策类型</span>
-            <span>特批值</span>
-            <span>单位</span>
+            <span>申请方式</span>
+            <span>政策档位</span>
+            <span>折扣/单价</span>
+            <span>计价单位</span>
             <span>返佣</span>
             <span></span>
           </div>
@@ -173,14 +173,14 @@
         </select>
       </label>
       <label>
-        <span>价格模式</span>
+        <span>申请方式</span>
         <select class="product-price-type">
           <option value="discount">折扣</option>
           <option value="fixed_price">一口价</option>
         </select>
       </label>
       <label>
-        <span>政策类型</span>
+        <span>政策档位</span>
         <select class="product-price-mode">
           <option value="default">常规特批</option>
           <option value="breakthrough">突破特批</option>
@@ -189,14 +189,14 @@
         </select>
       </label>
       <label>
-        <span>特批值</span>
+        <span>折扣/单价</span>
         <div class="price-value-wrap">
           <input class="product-discount" placeholder="例如：8">
           <b class="price-fixed-suffix">折</b>
         </div>
       </label>
       <label class="product-unit-field" hidden>
-        <span>单位</span>
+        <span>计价单位</span>
         <input class="product-price-unit" placeholder="如：/g、/千分钟、/GB">
       </label>
       <label>
@@ -207,6 +207,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-price-ux-unitcopy"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-ui-polish"></script>
 </body>
 </html>

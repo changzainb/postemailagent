@@ -583,7 +583,7 @@ function renderThresholdWarnings(products) {
   thresholdBox.classList.toggle("has-warning", warnings.length > 0);
   if (warnings.length === 0) {
     const item = document.createElement("li");
-    item.textContent = "当前价格和返佣已对照产品报价规则。";
+    item.textContent = "已按报价规则校验，无明显异常。";
     thresholdList.appendChild(item);
     return;
   }
