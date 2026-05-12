@@ -36,20 +36,26 @@
     <section class="content">
       <div class="toolbar">
         <input id="searchInput" placeholder="搜索产品名">
-        <span class="muted" id="countText"></span>
         <button class="ghost danger" id="batchDeleteBtn">批量删除</button>
         <button class="ghost" id="batchCancelBtn" hidden>取消</button>
       </div>
       <div class="pagination-bar" aria-label="产品分页">
-        <div class="page-size-control">
-          <span>每页</span>
-          <input id="pageSizeInput" type="number" min="1" max="200" step="1" value="10" inputmode="numeric">
-          <span>行</span>
-        </div>
-        <div class="page-controls">
-          <button class="ghost small" id="prevPageBtn" type="button">上一页</button>
-          <span class="page-info" id="pageInfo">第 1 / 1 页</span>
-          <button class="ghost small" id="nextPageBtn" type="button">下一页</button>
+        <span class="page-summary" id="countText"></span>
+        <div class="pagination-controls">
+          <label class="page-size-control">
+            <span>每页</span>
+            <select id="pageSizeSelect" aria-label="每页行数">
+              <option value="10" selected>10 行</option>
+              <option value="20">20 行</option>
+              <option value="50">50 行</option>
+              <option value="100">100 行</option>
+            </select>
+          </label>
+          <div class="page-controls">
+            <button class="ghost small" id="prevPageBtn" type="button">上一页</button>
+            <span class="page-info" id="pageInfo">第 1 / 1 页</span>
+            <button class="ghost small" id="nextPageBtn" type="button">下一页</button>
+          </div>
         </div>
       </div>
       <div class="rule-table-wrap">

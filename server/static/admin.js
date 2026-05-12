@@ -16,7 +16,7 @@ const els = {
   ruleBody: document.getElementById('ruleTableBody'),
   countText: document.getElementById('countText'),
   searchInput: document.getElementById('searchInput'),
-  pageSizeInput: document.getElementById('pageSizeInput'),
+  pageSizeSelect: document.getElementById('pageSizeSelect'),
   pageInfo: document.getElementById('pageInfo'),
   prevPageBtn: document.getElementById('prevPageBtn'),
   nextPageBtn: document.getElementById('nextPageBtn'),
@@ -169,8 +169,8 @@ function syncSelectionUI(filtered, pageItems, totalPages) {
   if (els.pageInfo) els.pageInfo.textContent = `第 ${state.page} / ${totalPages} 页`;
   if (els.prevPageBtn) els.prevPageBtn.disabled = state.page <= 1;
   if (els.nextPageBtn) els.nextPageBtn.disabled = state.page >= totalPages || total === 0;
-  if (els.pageSizeInput && Number(els.pageSizeInput.value) !== state.pageSize) {
-    els.pageSizeInput.value = String(state.pageSize);
+  if (els.pageSizeSelect && Number(els.pageSizeSelect.value) !== state.pageSize) {
+    els.pageSizeSelect.value = String(state.pageSize);
   }
 }
 
@@ -490,28 +490,16 @@ els.nextPageBtn?.addEventListener('click', () => {
   state.page += 1;
   renderProducts();
 });
-els.pageSizeInput?.addEventListener('change', () => {
-  state.pageSize = pageSizeValueFromInput();
+els.pageSizeSelect?.addEventListener('change', () => {
+  state.pageSize = pageSizeValueFromSelect();
   state.page = 1;
-  renderProducts();
-});
-els.pageSizeInput?.addEventListener('blur', () => {
-  state.pageSize = pageSizeValueFromInput();
-  els.pageSizeInput.value = String(state.pageSize);
-});
-els.pageSizeInput?.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter') return;
-  event.preventDefault();
-  state.pageSize = pageSizeValueFromInput();
-  state.page = 1;
-  els.pageSizeInput.value = String(state.pageSize);
   renderProducts();
 });
 
-function pageSizeValueFromInput() {
-  const raw = Number(els.pageSizeInput?.value);
-  if (!Number.isFinite(raw)) return 10;
-  return Math.min(200, Math.max(1, Math.floor(raw)));
+function pageSizeValueFromSelect() {
+  const allowed = [10, 20, 50, 100];
+  const raw = Number(els.pageSizeSelect?.value);
+  return allowed.includes(raw) ? raw : 10;
 }
 
 function escapeHtml(text) {
