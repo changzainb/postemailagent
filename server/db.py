@@ -34,6 +34,12 @@ def init_db():
             conn.execute(
                 "ALTER TABLE pricing_rules ADD COLUMN billing_modes TEXT DEFAULT '[\"prepaid\",\"postpaid\"]'"
             )
+        if "price_type" not in columns:
+            conn.execute("ALTER TABLE pricing_rules ADD COLUMN price_type TEXT DEFAULT 'discount'")
+            conn.execute(
+                "UPDATE pricing_rules SET price_type='fixed_price' "
+                "WHERE product_id IN (SELECT id FROM products WHERE name LIKE '%一口价%')"
+            )
         scenario_columns = {row[1] for row in conn.execute("PRAGMA table_info(scenarios)").fetchall()}
         if "label" in scenario_columns:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scenarios_label ON scenarios(label)")

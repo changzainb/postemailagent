@@ -2,6 +2,7 @@
 // 用法：在页面里调 ChangeLog.open()；首次调用会自动注入 dialog
 (function () {
   const FIELD_LABELS = {
+    price_type: "价格模式",
     normal_discount: "常规折扣",
     normal_commission: "常规返佣",
     breakthrough_discount: "突破折扣",
@@ -16,6 +17,7 @@
     }[c]));
   }
   function fmtVal(field, v) {
+    if (field === "price_type") return v === "fixed_price" ? "一口价" : "折扣";
     if (field === "billing_modes") return formatBillingModes(v);
     if (field === "no_commission") return Number(v) ? "不支持" : "支持";
     if (v === null || v === undefined || v === "") return "—";

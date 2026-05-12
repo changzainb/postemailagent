@@ -235,6 +235,7 @@ def create_app():
         sql = (
             "SELECT p.id, p.scenario_id, s.label AS scenario_label, p.name, p.aliases, "
             "p.status, p.source, p.updated_at, "
+            "COALESCE(r.price_type, 'discount') AS price_type, "
             "r.normal_discount, r.normal_commission, r.breakthrough_discount, "
             "r.breakthrough_commission, r.billing_modes, r.no_commission, r.remark, "
             "r.updated_by, r.updated_at AS rule_updated_at "
@@ -343,6 +344,7 @@ def create_app():
             "SELECT * FROM pricing_rules WHERE product_id=?", (product_id,)
         ).fetchone()
         fields = {
+            "price_type": _normalize_price_type(body.get("price_type")),
             "normal_discount": (body.get("normal_discount") or "").strip(),
             "normal_commission": (body.get("normal_commission") or "").strip(),
             "breakthrough_discount": (body.get("breakthrough_discount") or "").strip(),
@@ -353,7 +355,7 @@ def create_app():
             "updated_by": user.get("username", ""),
         }
         # 计算 diff（只看业务字段，updated_by/at 不算）
-        diff_keys = ["normal_discount", "normal_commission", "breakthrough_discount",
+        diff_keys = ["price_type", "normal_discount", "normal_commission", "breakthrough_discount",
                  "breakthrough_commission", "billing_modes", "no_commission", "remark"]
         old_dict = dict(old) if old else {}
         diff = {}
@@ -375,22 +377,22 @@ def create_app():
             )
         if old:
             db.execute(
-                "UPDATE pricing_rules SET normal_discount=?, normal_commission=?, "
+                "UPDATE pricing_rules SET price_type=?, normal_discount=?, normal_commission=?, "
                 "breakthrough_discount=?, breakthrough_commission=?, billing_modes=?, no_commission=?, "
                 "remark=?, updated_by=?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?",
                 (
-                    fields["normal_discount"], fields["normal_commission"],
+                    fields["price_type"], fields["normal_discount"], fields["normal_commission"],
                     fields["breakthrough_discount"], fields["breakthrough_commission"],
                     fields["billing_modes"], fields["no_commission"], fields["remark"], fields["updated_by"], product_id,
                 ),
             )
         else:
             db.execute(
-                "INSERT INTO pricing_rules(product_id, normal_discount, normal_commission, "
+                "INSERT INTO pricing_rules(product_id, price_type, normal_discount, normal_commission, "
                 "breakthrough_discount, breakthrough_commission, billing_modes, no_commission, remark, updated_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    product_id, fields["normal_discount"], fields["normal_commission"],
+                    product_id, fields["price_type"], fields["normal_discount"], fields["normal_commission"],
                     fields["breakthrough_discount"], fields["breakthrough_commission"],
                     fields["billing_modes"], fields["no_commission"], fields["remark"], fields["updated_by"],
                 ),
@@ -406,6 +408,9 @@ def create_app():
         modes = [x for x in (value or []) if x in allowed]
         return modes or ["prepaid", "postpaid"]
 
+    def _normalize_price_type(value):
+        return value if value in {"discount", "fixed_price"} else "discount"
+
     @app.post("/api/match")
     def api_match():
         body = request.get_json(silent=True) or {}
@@ -414,7 +419,7 @@ def create_app():
             names = [names]
         rows = get_db().execute(
             "SELECT p.id, p.name, p.name_normalized, p.aliases, p.scenario_id, "
-            "s.label AS scenario_label, "
+            "s.label AS scenario_label, COALESCE(r.price_type, 'discount') AS price_type, "
             "r.normal_discount, r.normal_commission, r.breakthrough_discount, "
             "r.breakthrough_commission, r.billing_modes, r.no_commission, r.remark "
             "FROM products p "
@@ -729,6 +734,7 @@ def _format_candidate(item, confidence):
         "name": item["name"],
         "scenario_id": item["scenario_id"],
         "scenario_label": item["scenario_label"],
+        "price_type": item["price_type"] or "discount",
         "normal_discount": item["normal_discount"] or "",
         "normal_commission": item["normal_commission"] or "",
         "breakthrough_discount": item["breakthrough_discount"] or "",

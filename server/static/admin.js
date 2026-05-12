@@ -237,6 +237,15 @@ function billingModeBadges(modes) {
   ).join('');
 }
 
+function normalizePriceType(value, productName = '') {
+  if (value === 'fixed_price') return 'fixed_price';
+  return productName.includes('一口价') ? 'fixed_price' : 'discount';
+}
+
+function priceTypeText(value) {
+  return normalizePriceType(value) === 'fixed_price' ? '一口价' : '折扣';
+}
+
 function parseDiscountNum(s) {
   const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*折/);
   return m ? m[1] : '';
@@ -247,6 +256,7 @@ function parseCommissionNum(s) {
 }
 
 function productRow(p) {
+  const priceType = normalizePriceType(p.price_type, p.name || '');
   const updated = p.rule_updated_at
     ? `<div class="meta"><b>${escapeHtml(p.updated_by || '系统')}</b>${formatTime(p.rule_updated_at)}</div>`
     : '<span class="muted" style="font-size:12px">未维护</span>';
@@ -257,6 +267,24 @@ function productRow(p) {
     <textarea class="cell-edit remark-edit" data-field="remark" rows="3" placeholder="适用条件 / 注意事项" hidden>${escapeHtml(val || '')}</textarea>
     <div class="update-meta">${updated}</div>
   </td>`;
+  const priceBox = (field, label, val, suffix, ph) => {
+    if (priceType === 'fixed_price') {
+      return `<div class="rule-item">
+        <span class="rule-label">${label.replace('折扣', '一口价')}</span>
+        <span class="cell-view rule-value" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+        <input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(val || '')}" placeholder="如：0.357/g 或 一口价说明" hidden>
+      </div>`;
+    }
+    const num = suffix === '折' ? parseDiscountNum(val) : parseCommissionNum(val);
+    return `<div class="rule-item">
+      <span class="rule-label">${label}</span>
+      <span class="cell-view rule-value" data-view="${field}">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</span>
+      <span class="cell-edit input-suffix" data-suffix-field="${field}" hidden>
+        <input type="text" inputmode="decimal" data-field="${field}" data-suffix="${suffix}" value="${escapeHtml(num)}" placeholder="${ph}">
+        <span class="suffix">${suffix}</span>
+      </span>
+    </div>`;
+  };
   const numBox = (field, label, val, suffix, ph) => {
     const num = suffix === '折' ? parseDiscountNum(val) : parseCommissionNum(val);
     return `<div class="rule-item">
@@ -280,6 +308,14 @@ function productRow(p) {
     <td class="rule-grid-cell">
       <div class="rule-grid">
         <div class="rule-item rule-item-wide">
+          <span class="rule-label">价格模式</span>
+          <span class="cell-view price-type-view" data-view="price_type">${priceTypeText(priceType)}</span>
+          <select class="cell-edit price-type-edit" data-field="price_type" hidden>
+            <option value="discount" ${priceType === 'discount' ? 'selected' : ''}>折扣</option>
+            <option value="fixed_price" ${priceType === 'fixed_price' ? 'selected' : ''}>一口价</option>
+          </select>
+        </div>
+        <div class="rule-item rule-item-wide">
           <span class="rule-label">计费方式</span>
           <span class="cell-view billing-mode-view" data-view="billing_modes" title="${escapeHtml(billingModeText(billingModes))}">${billingModeBadges(billingModes)}</span>
           <div class="cell-edit billing-mode-edit" hidden>
@@ -287,9 +323,9 @@ function productRow(p) {
             <label><input type="checkbox" data-field="billing_modes" data-mode="postpaid" ${billingModes.includes('postpaid') ? 'checked' : ''}>后付费</label>
           </div>
         </div>
-        ${numBox('normal_discount', '常规折扣', p.normal_discount, '折', '9')}
+        ${priceBox('normal_discount', '常规折扣', p.normal_discount, '折', '9')}
         ${numBox('normal_commission', '常规返佣', p.normal_commission, '%返佣', '5')}
-        ${numBox('breakthrough_discount', '突破折扣', p.breakthrough_discount, '折', '8')}
+        ${priceBox('breakthrough_discount', '突破折扣', p.breakthrough_discount, '折', '8')}
         ${numBox('breakthrough_commission', '突破返佣', p.breakthrough_commission, '%返佣', '10')}
         <div class="rule-item rule-support" title="返佣支持">
           <span class="rule-label">返佣</span>
@@ -309,19 +345,65 @@ function productRow(p) {
   </tr>`;
 }
 
-function bindRow(productId) {
-  const row = els.ruleBody.querySelector(`tr[data-id="${productId}"]`);
-  if (!row) return;
-  row.querySelectorAll('input.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
+function currentPriceFieldValue(ruleItem, field) {
+  const suffixInput = ruleItem.querySelector(`.input-suffix input[data-field="${field}"]`);
+  if (suffixInput) return suffixInput.value.trim();
+  const textInput = ruleItem.querySelector(`input[data-field="${field}"]`);
+  if (textInput) return textInput.value.trim();
+  return ruleItem.querySelector(`[data-view="${field}"]`)?.textContent.trim().replace(/^—$/, '') || '';
+}
+
+function replacePriceEditor(row, field, fixedPrice) {
+  const view = row.querySelector(`[data-view="${field}"]`);
+  if (!view) return;
+  const ruleItem = view.closest('.rule-item');
+  const label = ruleItem.querySelector('.rule-label');
+  const baseLabel = field === 'normal_discount' ? '常规' : '突破';
+  const value = currentPriceFieldValue(ruleItem, field);
+  label.textContent = `${baseLabel}${fixedPrice ? '一口价' : '折扣'}`;
+  const oldEdit = ruleItem.querySelector('.cell-edit');
+  if (!oldEdit) return;
+  if (fixedPrice) {
+    oldEdit.outerHTML = `<input class="cell-edit price-text-edit" type="text" data-field="${field}" value="${escapeHtml(value)}" placeholder="如：0.357/g 或 一口价说明">`;
+  } else {
+    oldEdit.outerHTML = `<span class="cell-edit input-suffix" data-suffix-field="${field}">
+      <input type="text" inputmode="decimal" data-field="${field}" data-suffix="折" value="${escapeHtml(parseDiscountNum(value) || value)}" placeholder="${field === 'normal_discount' ? '9' : '8'}">
+      <span class="suffix">折</span>
+    </span>`;
+  }
+}
+
+function syncPriceTypeEditors(row, priceType) {
+  const fixedPrice = priceType === 'fixed_price';
+  replacePriceEditor(row, 'normal_discount', fixedPrice);
+  replacePriceEditor(row, 'breakthrough_discount', fixedPrice);
+  bindInlineEditors(row);
+}
+
+function bindInlineEditors(row) {
+  row.querySelectorAll('input.cell-edit, select.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
+    if (input.dataset.boundDirty === '1') return;
+    input.dataset.boundDirty = '1';
     input.addEventListener('input', () => row.classList.add('dirty'));
     input.addEventListener('change', () => row.classList.add('dirty'));
   });
-  // 数字输入：只允许数字和小数点
   row.querySelectorAll('.input-suffix input').forEach((input) => {
+    if (input.dataset.boundNumeric === '1') return;
+    input.dataset.boundNumeric = '1';
     input.addEventListener('input', () => {
       const cleaned = input.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
       if (cleaned !== input.value) input.value = cleaned;
     });
+  });
+}
+
+function bindRow(productId) {
+  const row = els.ruleBody.querySelector(`tr[data-id="${productId}"]`);
+  if (!row) return;
+  bindInlineEditors(row);
+  row.querySelector('select[data-field="price_type"]')?.addEventListener('change', (event) => {
+    syncPriceTypeEditors(row, event.target.value);
+    row.classList.add('dirty');
   });
   const checkbox = row.querySelector('input.row-check');
   if (checkbox) {
@@ -368,7 +450,7 @@ function setRowEditing(row, editing) {
 async function saveRow(row, productId) {
   row.classList.add('saving');
   const body = {billing_modes: []};
-  row.querySelectorAll('input.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
+  row.querySelectorAll('input.cell-edit, select.cell-edit, textarea.cell-edit, .input-suffix input, .billing-mode-edit input, .commission-check input').forEach((input) => {
     const field = input.dataset.field;
     if (!field) return;
     if (field === 'billing_modes') {
@@ -378,6 +460,8 @@ async function saveRow(row, productId) {
     if (input.type === 'checkbox') {
       // UI 复选框语义：勾 = 支持返佣；DB 字段是 no_commission（true = 不支持），需翻转
       body[field] = field === 'no_commission' ? !input.checked : input.checked;
+    } else if (input.tagName === 'SELECT') {
+      body[field] = input.value;
     } else if (input.dataset.suffix) {
       const v = input.value.trim();
       body[field] = v ? v + input.dataset.suffix : '';
@@ -385,6 +469,12 @@ async function saveRow(row, productId) {
       body[field] = input.value;
     }
   });
+  if (body.price_type === 'discount') {
+    ['normal_discount', 'breakthrough_discount'].forEach((field) => {
+      const value = (body[field] || '').trim();
+      if (/^\d+(?:\.\d+)?$/.test(value)) body[field] = `${value}折`;
+    });
+  }
   if (!body.billing_modes.length) {
     row.classList.remove('saving');
     alert('计费方式至少选一个');

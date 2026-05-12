@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-product-layout-fix">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-price-type">
 </head>
 <body>
   <main class="app-shell">
@@ -78,8 +78,8 @@
             <span>序号</span>
             <span>产品名称</span>
             <span>计费方式</span>
-            <span>折扣策略</span>
-            <span>折扣</span>
+            <span>价格策略</span>
+            <span>价格 / 折扣</span>
             <span>返佣</span>
             <span></span>
           </div>
@@ -171,7 +171,7 @@
         </select>
       </label>
       <label>
-        <span>折扣策略</span>
+        <span>价格策略</span>
         <select class="product-price-mode">
           <option value="default">常规政策</option>
           <option value="breakthrough">突破政策</option>
@@ -180,8 +180,8 @@
         </select>
       </label>
       <label>
-        <span>折扣</span>
-        <input class="product-discount" placeholder="例如：95折">
+        <span>价格 / 折扣</span>
+        <input class="product-discount" placeholder="例如：95折 或 0.357/g">
       </label>
       <label>
         <span>返佣</span>
@@ -191,6 +191,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-product-layout-fix"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-price-type-copy"></script>
 </body>
 </html>

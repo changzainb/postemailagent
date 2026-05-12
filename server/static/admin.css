@@ -291,7 +291,7 @@ a:hover { text-decoration: underline; }
 .rule-table thead th.col-actions { background: var(--panel-strong); }
 .rule-table tr.editing td.actions { background: #f5faff; }
 .rule-table tr.dirty td.actions { background: #fffaf2; }
-.rule-table input[type="text"], .rule-table textarea {
+.rule-table input[type="text"], .rule-table select, .rule-table textarea {
   width: 100%;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -299,7 +299,7 @@ a:hover { text-decoration: underline; }
   background: #fff;
   font-size: 12.5px;
 }
-.rule-table input[type="text"] { height: 28px; }
+.rule-table input[type="text"], .rule-table select { height: 28px; }
 .rule-table textarea {
   min-height: 72px;
   padding: 6px 8px;
@@ -336,6 +336,19 @@ a:hover { text-decoration: underline; }
   line-height: 1.2;
 }
 .billing-mode-edit label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.price-type-view {
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid #d8e0ea;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+}
+.price-type-edit,
+.price-text-edit {
+  min-width: 0;
+}
 .rule-grid-cell { min-width: 0; }
 .rule-grid {
   display: grid;
