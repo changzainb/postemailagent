@@ -232,6 +232,12 @@ function billingModeLabel(mode) {
   return mode === "postpaid" ? "后付费" : "预付费";
 }
 
+function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+  }[c]));
+}
+
 function setupBillingModeSelect(row, modes, preferred) {
   const select = row.querySelector(".product-billing-mode");
   const available = normalizeBillingModes(modes);
@@ -255,6 +261,7 @@ function getProducts() {
     breakthroughCommission: row.dataset.breakthroughCommission || "",
     noCommission: row.dataset.noCommission === "1",
     matched: row.dataset.matched === "1",
+    suggesting: row.dataset.suggesting === "1",
   })).filter((p) => p.name || p.discount || p.commission);
 }
 
@@ -282,6 +289,7 @@ function setMatchTag(row, text, kind) {
 }
 
 function applyMatchedRule(row, matched) {
+  row.dataset.suggesting = "0";
   if (!matched) {
     row.dataset.matched = "0";
     row.dataset.normalDiscount = "";
@@ -310,8 +318,126 @@ function applyMatchedRule(row, matched) {
   }
 }
 
+function normalizeSearchText(text) {
+  return String(text || "").toLowerCase().replace(/[\s\-_/（）()，,、；;：:]+/g, "");
+}
+
+function findProductSuggestions(keyword, limit = 8) {
+  const q = normalizeSearchText(keyword);
+  if (!q) return [];
+  const scored = [];
+  catalog.products.forEach((p) => {
+    const name = p.name || "";
+    const norm = normalizeSearchText(name);
+    const scenario = catalog.scenarioById[p.scenario_id]?.label || "";
+    let score = 0;
+    if (norm.includes(q)) score += 50;
+    if (name.includes(keyword)) score += 20;
+    if (normalizeSearchText(scenario).includes(q)) score += 8;
+    if (!score) return;
+    if (norm.startsWith(q)) score += 10;
+    scored.push({score, product: p});
+  });
+  return scored
+    .sort((a, b) => b.score - a.score || a.product.name.length - b.product.name.length)
+    .slice(0, limit)
+    .map((x) => x.product);
+}
+
+function setupProductSuggest(row) {
+  const combo = row.querySelector(".product-combo");
+  const input = row.querySelector(".product-name");
+  const panel = row.querySelector(".product-suggest-panel");
+  let activeIdx = -1;
+  let currentList = [];
+
+  function render(list) {
+    currentList = list;
+    if (!list.length) {
+      panel.innerHTML = input.value.trim()
+        ? `<li class="empty">无匹配产品，按回车保留输入</li>`
+        : "";
+      panel.hidden = !input.value.trim();
+      return;
+    }
+    panel.innerHTML = list.map((p, i) => {
+      const scenario = catalog.scenarioById[p.scenario_id]?.label || "未分类";
+      const discount = p.normal_discount || "未维护折扣";
+      const commission = p.no_commission ? "无返佣" : (p.normal_commission || "未维护返佣");
+      return `<li role="option" data-id="${p.id}" class="${i === activeIdx ? "active" : ""}">
+        <strong>${escapeHtml(p.name)}</strong>
+        <span>${escapeHtml(scenario)} · ${escapeHtml(discount)} / ${escapeHtml(commission)}</span>
+      </li>`;
+    }).join("");
+    panel.hidden = false;
+  }
+
+  function open() {
+    activeIdx = -1;
+    render(findProductSuggestions(input.value));
+  }
+
+  function close() {
+    panel.hidden = true;
+    activeIdx = -1;
+  }
+
+  function pick(product) {
+    if (!product) return;
+    input.value = product.name;
+    applyMatchedRule(row, product);
+    row.querySelector(".product-price-mode").value = "default";
+    applyModeToRow(row, "default");
+    close();
+    generateEmail();
+  }
+
+  input.addEventListener("focus", () => {
+    if (input.value.trim()) open();
+  });
+  input.addEventListener("input", () => {
+    row.dataset.productId = "";
+    row.dataset.suggesting = input.value.trim() ? "1" : "0";
+    row.classList.remove("unmatched");
+    setMatchTag(row, "", "");
+    open();
+  });
+  input.addEventListener("keydown", (event) => {
+    const items = currentList;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeIdx = Math.min(items.length - 1, activeIdx + 1);
+      render(items);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeIdx = Math.max(0, activeIdx - 1);
+      render(items);
+    } else if (event.key === "Enter") {
+      if (activeIdx >= 0 && items[activeIdx]) {
+        event.preventDefault();
+        pick(items[activeIdx]);
+      } else {
+        close();
+      }
+    } else if (event.key === "Escape") {
+      close();
+    }
+  });
+  panel.addEventListener("mousedown", (event) => {
+    const li = event.target.closest("li[data-id]");
+    if (!li) return;
+    event.preventDefault();
+    const product = catalog.productById.get(Number(li.dataset.id));
+    pick(product);
+  });
+  document.addEventListener("mousedown", (event) => {
+    if (!combo.contains(event.target)) close();
+  });
+}
+
 async function matchProductName(row) {
   const name = row.querySelector(".product-name").value.trim();
+  row.dataset.suggesting = "0";
   if (!name) {
     applyMatchedRule(row, null);
     return;
@@ -342,7 +468,7 @@ async function matchProductName(row) {
 function buildThresholdWarnings(products) {
   return products.flatMap((product, index) => {
     const warnings = [];
-    if (!product.matched && product.name) {
+    if (!product.matched && product.name && !product.suggesting) {
       warnings.push(`产品${index + 1} ${product.name}：商务库未登记，已通知商务补登。`);
     }
     if (product.noCommission && parseCommissionPercent(product.commission) > 0) {
@@ -544,6 +670,7 @@ function addProduct(product = {}) {
     row.querySelector(".product-price-mode").value = "manual";
     generateEmail();
   });
+  setupProductSuggest(row);
   row.querySelector(".product-name").addEventListener("change", () => matchProductName(row));
   row.addEventListener("input", (event) => {
     if (!event.target.classList.contains("product-discount")) generateEmail();

@@ -158,7 +158,10 @@
       <div class="product-index"></div>
       <label>
         <span>产品名称</span>
-        <input class="product-name">
+        <div class="product-combo">
+          <input class="product-name" autocomplete="off" placeholder="输入点播、云点播、TRTC 等关键词">
+          <ul class="product-suggest-panel" role="listbox" hidden></ul>
+        </div>
       </label>
       <label>
         <span>计费方式</span>
