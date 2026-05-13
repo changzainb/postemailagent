@@ -46,8 +46,27 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line-soft);
 }
 .topbar h1 { margin: 0; font-size: 16px; }
-.topbar-left { display: flex; align-items: baseline; gap: 12px; }
+.topbar-left { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .topbar-right { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #bfd3e8;
+  border-radius: 6px;
+  background: #eef6ff;
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+.home-link:hover {
+  background: #e2f0ff;
+  text-decoration: none;
+}
+.topbar-separator {
+  color: #98a2b3;
+}
 
 .ghost {
   background: #fff;

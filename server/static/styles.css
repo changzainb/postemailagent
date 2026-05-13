@@ -138,6 +138,18 @@ h2 {
   gap: 8px;
 }
 
+.admin-entry {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.admin-entry:hover {
+  color: var(--accent-dark);
+  text-decoration: underline;
+}
+
 .header-actions .ghost-button {
   display: inline-flex;
   align-items: center;

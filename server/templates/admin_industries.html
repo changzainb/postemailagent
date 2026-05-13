@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>行业 → 产品 匹配</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v=20260513-launch-ready">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v=20260513-nav-hierarchy">
   <style>
     .ind-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 24px; align-items: start; }
     .ind-side { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; max-height: calc(100vh - 130px); overflow-y: auto; }
@@ -54,12 +54,13 @@
 <body>
   <header class="topbar">
     <div class="topbar-left">
+      <a class="home-link" href="/">特批价格邮件生成器</a>
+      <span class="topbar-separator">/</span>
       <h1>行业 → 产品 匹配</h1>
       <span class="muted">勾选保存后，前端选这个行业会自动出这批产品</span>
     </div>
     <div class="topbar-right">
       <a class="ghost" href="/admin">规则后台</a>
-      <a class="ghost" href="/">销售生成器</a>
       <button class="ghost" id="logBtn">变更记录</button>
       <button class="ghost" id="logoutBtn">退出</button>
     </div>
