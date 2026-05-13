@@ -124,6 +124,7 @@ const industryTagsEl = document.getElementById("industryTags");
 const matchStatus = document.getElementById("matchStatus");
 const thresholdBox = document.getElementById("thresholdBox");
 const thresholdList = document.getElementById("thresholdList");
+let bodyCopyValidationVisible = false;
 
 const catalog = {
   scenarios: [],
@@ -569,9 +570,6 @@ async function matchProductName(row) {
 
 function buildThresholdWarnings(products) {
   const warnings = [];
-  if (!fields.customerAccount.value.trim()) {
-    warnings.push("客户腾讯云账号 ID 必填，填写后才能复制正文。");
-  }
   products.forEach((product, index) => {
     const productWarnings = [];
     if (!product.matched && product.name && !product.suggesting) {
@@ -728,16 +726,17 @@ function generateEmail() {
   const applicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
   const bodyApplicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
   const accountMissing = !fields.customerAccount.value.trim();
-  fields.customerAccount.classList.toggle("required-missing", accountMissing);
+  fields.customerAccount.classList.toggle("required-missing", bodyCopyValidationVisible && accountMissing);
   // 标记缺折扣/返佣的行
   let missingFields = 0;
   document.querySelectorAll(".product-row").forEach((row) => {
+    const n = row.querySelector(".product-name").value.trim();
     const d = row.querySelector(".product-discount").value.trim();
     const u = row.querySelector(".product-price-unit")?.value.trim() || "";
     const c = row.querySelector(".product-commission").value.trim();
     const needsUnit = row.dataset.priceType === "fixed_price";
-    if (!d || !c || (needsUnit && !u)) {
-      row.classList.add("incomplete");
+    if (!n || !d || !c || (needsUnit && !u)) {
+      row.classList.toggle("incomplete", bodyCopyValidationVisible);
       missingFields++;
     } else {
       row.classList.remove("incomplete");
@@ -752,13 +751,12 @@ function generateEmail() {
     return `【申请产品${index + 1}】产品名称/折扣/返佣：${product.name || "待填写产品名称"}，${billing}  ${priceValue}/${commission}`;
   });
 
-  // 复制按钮根据缺失情况禁用
+  // 复制正文时再做必填校验，初始页面保持草稿感。
   const copyBodyBtn = document.getElementById("copyBodyButton");
   if (copyBodyBtn) {
-    copyBodyBtn.disabled = missingFields > 0 || accountMissing;
     const titles = [];
-    if (accountMissing) titles.push("客户腾讯云账号 ID 必填");
-    if (missingFields > 0) titles.push(`还有 ${missingFields} 行价格、单位或返佣未填`);
+    if (accountMissing) titles.push("复制正文前补客户腾讯云账号 ID");
+    if (missingFields > 0) titles.push(`还有 ${missingFields} 行产品信息未填完整`);
     copyBodyBtn.title = titles.join("；");
   }
 
@@ -780,6 +778,11 @@ ${productLines.join("\n")}
 2、项目背景：${fields.projectBackground.value.trim()}
 3、竞争对手情况：${fields.competition.value.trim()}
 4、代理商贡献说明：${fields.agentContribution.value.trim()}`;
+
+  if (bodyCopyValidationVisible && getBodyCopyMissingItems().length === 0) {
+    copyStatus.textContent = "";
+    copyStatus.classList.remove("is-warning");
+  }
 }
 
 function ensureMatchTag(row) {
@@ -1001,14 +1004,54 @@ function matchProducts() {
   applyIndustryTags({preserveManual: true});
 }
 
+function getBodyCopyMissingItems() {
+  const missing = [];
+  if (!fields.customerAccount.value.trim()) missing.push("客户腾讯云账号 ID");
+  Array.from(productList.querySelectorAll(".product-row")).forEach((row, index) => {
+    const prefix = `产品${index + 1}`;
+    const needsUnit = row.dataset.priceType === "fixed_price";
+    if (!row.querySelector(".product-name").value.trim()) missing.push(`${prefix}名称`);
+    if (!row.querySelector(".product-discount").value.trim()) missing.push(`${prefix}折扣/单价`);
+    if (needsUnit && !row.querySelector(".product-price-unit")?.value.trim()) missing.push(`${prefix}计价单位`);
+    if (!row.querySelector(".product-commission").value.trim()) missing.push(`${prefix}返佣`);
+  });
+  return missing;
+}
+
+function formatMissingCopyMessage(missing) {
+  const visible = missing.slice(0, 3).join("、");
+  const suffix = missing.length > 3 ? "等" : "";
+  return `还差 ${missing.length} 项：${visible}${suffix}。补齐后再复制正文。`;
+}
+
+async function copyBodyText() {
+  bodyCopyValidationVisible = true;
+  generateEmail();
+  const missing = getBodyCopyMissingItems();
+  if (missing.length) {
+    copyStatus.textContent = formatMissingCopyMessage(missing);
+    copyStatus.classList.add("is-warning");
+    fields.customerAccount.scrollIntoView({behavior: "smooth", block: "center"});
+    return;
+  }
+  await copyText(emailBody.value, "正文");
+}
+
 async function copyText(text, label) {
   await navigator.clipboard.writeText(text);
   copyStatus.textContent = `${label}已复制`;
+  copyStatus.classList.remove("is-warning");
   setTimeout(() => { copyStatus.textContent = ""; }, 1800);
 }
 
 fieldIds.forEach((id) => {
-  fields[id].addEventListener("input", generateEmail);
+  fields[id].addEventListener("input", () => {
+    generateEmail();
+    if (bodyCopyValidationVisible && getBodyCopyMissingItems().length === 0) {
+      copyStatus.textContent = "";
+      copyStatus.classList.remove("is-warning");
+    }
+  });
 });
 
 document.getElementById("addProductButton").addEventListener("click", () => addProduct());
@@ -1102,7 +1145,7 @@ document.getElementById("resetButton").addEventListener("click", () => {
   updateIndustryStatus();
 });
 document.getElementById("copySubjectButton").addEventListener("click", () => copyText(emailSubject.value, "标题"));
-document.getElementById("copyBodyButton").addEventListener("click", () => copyText(emailBody.value, "正文"));
+document.getElementById("copyBodyButton").addEventListener("click", copyBodyText);
 
 (async () => {
   initializeFixedFields();

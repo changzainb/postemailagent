@@ -382,9 +382,9 @@ textarea:focus {
 }
 
 input.required-missing {
-  border-color: var(--danger);
-  background: #fff5f5;
-  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.10);
+  border-color: #e0a700;
+  background: #fffaf0;
+  box-shadow: 0 0 0 3px rgba(224, 167, 0, 0.12);
 }
 
 .button-field {
@@ -689,6 +689,11 @@ textarea[readonly] {
   font-size: 13px;
 }
 
+.status.is-warning {
+  color: #9a5b00;
+  font-weight: 600;
+}
+
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -794,16 +799,21 @@ textarea[readonly] {
 .match-tag[data-kind="warn"] { background: #e0a700; }
 .product-row { position: relative; }
 .product-row.unmatched { box-shadow: inset 3px 0 0 #e0a700; }
-.product-row.incomplete { box-shadow: inset 3px 0 0 #d83b01; }
+.product-row.incomplete {
+  background: #fffaf0;
+  box-shadow: inset 3px 0 0 #e0a700;
+}
 .product-row.duplicate {
   border-color: #f4c430;
   background: #fffbe6;
   box-shadow: inset 3px 0 0 #f4c430;
 }
+.product-row.incomplete .product-name:placeholder-shown,
 .product-row.incomplete .product-discount:placeholder-shown,
+.product-row.incomplete .product-price-unit:placeholder-shown,
 .product-row.incomplete .product-commission:placeholder-shown {
-  border-color: #d83b01;
-  background: #fff5f0;
+  border-color: #e0a700;
+  background: #fffaf0;
 }
 .primary-button:disabled,
 .ghost-button:disabled {
