@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260513-account-required">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260513-customer-columns">
 </head>
 <body>
   <main class="app-shell">
@@ -25,27 +25,31 @@
           <div class="section-heading">
             <h2>客户与项目</h2>
           </div>
-          <div class="field-grid customer-grid">
-            <label>
-              <span>客户公司全称</span>
-              <input id="customerName" value="" placeholder="如：广州某某网络科技有限公司">
-            </label>
-            <label>
-              <span>客户腾讯云账号 ID</span>
-              <input id="customerAccount" value="" required>
-            </label>
-            <label>
-              <span>商机编号</span>
-              <input id="projectName" value="" placeholder="如：20260417xxxxxxx">
-            </label>
-            <label>
-              <span>申请开始日期</span>
-              <input id="startDate" type="date">
-            </label>
-            <label>
-              <span>申请结束日期</span>
-              <input id="endDate" type="date">
-            </label>
+          <div class="customer-grid">
+            <div class="customer-column">
+              <label>
+                <span>客户公司全称</span>
+                <input id="customerName" value="" placeholder="如：广州某某网络科技有限公司">
+              </label>
+              <label>
+                <span>客户腾讯云账号 ID</span>
+                <input id="customerAccount" value="" required>
+              </label>
+              <label>
+                <span>商机编号</span>
+                <input id="projectName" value="" placeholder="如：20260417xxxxxxx">
+              </label>
+            </div>
+            <div class="customer-column date-column">
+              <label>
+                <span>申请开始日期</span>
+                <input id="startDate" type="date">
+              </label>
+              <label>
+                <span>申请结束日期</span>
+                <input id="endDate" type="date">
+              </label>
+            </div>
           </div>
           <div class="fixed-info" aria-label="固定申请信息">
             <span>代理商：<strong id="agentNameText">广州西骋网络科技有限公司</strong></span>
