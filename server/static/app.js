@@ -598,11 +598,13 @@ function getDuplicateProductGroups() {
     const productId = row.dataset.productId || "";
     const normalizedName = normalizeSearchText(name);
     if (!productId && !normalizedName) return;
-    const key = productId ? `id:${productId}` : `name:${normalizedName}`;
+    const key = normalizedName ? `name:${normalizedName}` : `id:${productId}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({row, index, name});
   });
-  return Array.from(groups.values()).filter((group) => group.length > 1);
+  return Array.from(groups.values()).filter((group) => (
+    group.length > 1 && group.some(({row}) => row.dataset.source !== "industry")
+  ));
 }
 
 function markDuplicateProducts() {
@@ -719,7 +721,7 @@ function generateEmail() {
   renderThresholdWarnings(products);
   const hasFixedPrice = products.some((product) => product.priceType === "fixed_price");
   const applicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
-  const bodyApplicationLabel = hasFixedPrice ? "价格与返佣申请" : "折扣与返佣申请";
+  const bodyApplicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
   // 标记缺折扣/返佣的行
   let missingFields = 0;
   document.querySelectorAll(".product-row").forEach((row) => {
@@ -737,11 +739,10 @@ function generateEmail() {
   const productLines = products.map((product, index) => {
     const commission = product.commission || "待填写返佣";
     const billing = billingModeLabel(product.billingMode);
-    const priceLabel = priceTypeLabel(product.priceType);
     const priceValue = product.priceType === "fixed_price"
       ? (product.discount ? (product.priceUnit ? formatFixedPrice(product.discount, product.priceUnit) : `${product.discount}（待填写单位）`) : "待填写价格")
       : (formatDiscountValue(product.discount) || "待填写折扣");
-    return `【申请产品${index + 1}】：产品：${product.name || "待填写产品名称"}；计费方式：${billing}；申请类型：${priceLabel}；特批条件：${priceValue}；返佣：${commission}`;
+    return `【申请产品${index + 1}】产品名称/折扣/返佣：${product.name || "待填写产品名称"}，${billing}  ${priceValue}/${commission}`;
   });
 
   // 复制按钮根据缺失情况禁用
@@ -753,9 +754,13 @@ function generateEmail() {
 
   emailSubject.value = `${fields.customerName.value.trim() || "客户"}${applicationLabel}--广州西骋`;
   emailBody.value = `尊敬的${fields.managerTitle.value.trim() || "腾讯云渠道经理"}：
-    您好！以下是${fields.customerName.value.trim() || "客户公司"}的${bodyApplicationLabel}，请处理，项目编号：${fields.projectName.value.trim() || "待填写"}
-    代理商全称：  ${fields.agentName.value.trim() || "待填写"}，腾讯云账号ID:  ${fields.agentAccount.value.trim() || "待填写"}；
-    客户公司全称：${fields.customerName.value.trim() || "待填写"}，腾讯云账号ID：${fields.customerAccount.value.trim() || "待填写"}
+
+       您好!  ${fields.customerName.value.trim() || "客户公司"}${bodyApplicationLabel}如下，请帮忙处理，
+
+代理名称：${fields.agentName.value.trim() || "待填写"}，代理腾讯云帐号ID: ${fields.agentAccount.value.trim() || "待填写"}；
+
+客户名称：${fields.customerName.value.trim() || "待填写"}，客户腾讯云帐号ID: ${fields.customerAccount.value.trim() || "待填写"}
+商机编号：${fields.projectName.value.trim() || "待填写"}
 
 ${productLines.join("\n")}
 
@@ -781,6 +786,7 @@ function addProduct(product = {}) {
   const fragment = productRowTemplate.content.cloneNode(true);
   const row = fragment.querySelector(".product-row");
   ensureMatchTag(row);
+  row.dataset.source = product.source || "manual";
 
   row.dataset.normalDiscount = product.normal_discount || "";
   row.dataset.normalCommission = product.normal_commission || "";
@@ -797,9 +803,9 @@ function addProduct(product = {}) {
   row.querySelector(".product-name").value = product.name || "";
   row.querySelector(".product-price-type").value = row.dataset.priceType;
   row.querySelector(".product-price-mode").value = product.priceMode || "default";
-  row.querySelector(".product-discount").value = row.dataset.priceType === "fixed_price" ? product.normal_discount || "" : stripDiscountSuffix(product.normal_discount || "");
-  row.querySelector(".product-price-unit").value = product.price_unit || "";
-  row.querySelector(".product-commission").value = product.normal_commission || "";
+  row.querySelector(".product-discount").value = product.discount ?? (row.dataset.priceType === "fixed_price" ? product.normal_discount || "" : stripDiscountSuffix(product.normal_discount || ""));
+  row.querySelector(".product-price-unit").value = product.priceUnit ?? (product.price_unit || "");
+  row.querySelector(".product-commission").value = product.commission ?? (product.normal_commission || "");
 
   if (product.id) {
     setMatchTag(row, "已匹配", "ok");
@@ -865,32 +871,44 @@ function resolveIndustryProducts(industry) {
 
 function getProductsForSelectedIndustries() {
   const products = [];
+  const seen = new Set();
   selectedIndustryTags.forEach((industry) => {
-    resolveIndustryProducts(industry).forEach((product) => products.push(product));
+    resolveIndustryProducts(industry).forEach((product) => {
+      const normalizedName = normalizeSearchText(product.name);
+      const key = normalizedName ? `name:${normalizedName}` : `id:${product.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      products.push({...product, source: "industry"});
+    });
   });
   return products;
 }
 
 function renderIndustryTags() {
   if (!industryTagsEl) return;
-  const tags = Array.from(selectedIndustryTags);
-  if (!tags.length) {
-    industryTagsEl.innerHTML = `<span class="industry-tags-empty">未选择行业标签</span>`;
+  const industries = catalog.industries || [];
+  if (!industries.length) {
+    industryTagsEl.innerHTML = `<span class="industry-tags-empty">暂无行业标签，可在后台行业匹配维护。</span>`;
     return;
   }
-  industryTagsEl.innerHTML = tags.map((tag) => `<button type="button" class="industry-tag" data-tag="${escapeHtml(tag)}" title="移除行业标签">
-    <span>${escapeHtml(tag)}</span><b aria-hidden="true">×</b>
-  </button>`).join("");
+  industryTagsEl.innerHTML = industries.map((industry) => {
+    const tag = industry.label || industry.key;
+    const selected = selectedIndustryTags.has(tag);
+    const count = Number(industry.count || 0);
+    return `<button type="button" class="industry-tag ${selected ? "selected" : ""}" data-tag="${escapeHtml(tag)}" aria-pressed="${selected ? "true" : "false"}">
+      <span>${escapeHtml(tag)}</span>${count ? `<b>${count}</b>` : ""}
+    </button>`;
+  }).join("");
 }
 
 function updateIndustryStatus() {
   const tags = Array.from(selectedIndustryTags);
   if (!tags.length) {
-    matchStatus.textContent = "选择一个或多个行业标签后，点击应用生成产品。";
+    matchStatus.textContent = "选择下方行业标签，系统会实时生成推荐产品。";
     return;
   }
   const count = getProductsForSelectedIndustries().length;
-  matchStatus.textContent = `已选：${tags.join("、")} · 将生成 ${count} 个产品，重复项会保留并提醒。`;
+  matchStatus.textContent = `已选：${tags.join("、")} · 已匹配 ${count} 个产品，行业重复项已自动去重。`;
 }
 
 function addIndustryTag(value) {
@@ -911,6 +929,7 @@ function toggleIndustryTag(value) {
   industryInput.value = "";
   renderIndustryTags();
   updateIndustryStatus();
+  applyIndustryTags({preserveManual: true});
   return true;
 }
 
@@ -918,28 +937,58 @@ function removeIndustryTag(value) {
   selectedIndustryTags.delete(value);
   renderIndustryTags();
   updateIndustryStatus();
+  applyIndustryTags({preserveManual: true});
 }
 
-function applyIndustryTags() {
+function getManualProductSnapshots() {
+  return Array.from(productList.querySelectorAll(".product-row"))
+    .filter((row) => row.dataset.source !== "industry")
+    .map((row) => ({
+      id: row.dataset.productId ? Number(row.dataset.productId) : undefined,
+      name: row.querySelector(".product-name").value.trim(),
+      billingMode: row.querySelector(".product-billing-mode").value,
+      price_type: row.querySelector(".product-price-type")?.value || row.dataset.priceType || "discount",
+      priceMode: row.querySelector(".product-price-mode").value,
+      discount: row.querySelector(".product-discount").value.trim(),
+      priceUnit: row.querySelector(".product-price-unit")?.value.trim() || "",
+      commission: row.querySelector(".product-commission").value.trim(),
+      normal_discount: row.dataset.normalDiscount || "",
+      normal_commission: row.dataset.normalCommission || "",
+      breakthrough_discount: row.dataset.breakthroughDiscount || "",
+      breakthrough_commission: row.dataset.breakthroughCommission || "",
+      price_unit: row.dataset.priceUnit || "",
+      billing_modes: JSON.parse(row.dataset.billingModes || "[\"prepaid\",\"postpaid\"]"),
+      no_commission: row.dataset.noCommission === "1",
+      source: "manual",
+    }))
+    .filter((product) => product.name || product.discount || product.priceUnit || product.commission);
+}
+
+function applyIndustryTags(options = {}) {
   addIndustryTag(industryInput.value);
+  const manualProducts = options.preserveManual ? getManualProductSnapshots() : [];
   if (!selectedIndustryTags.size) {
-    matchStatus.textContent = "先选择至少一个行业标签。";
+    productList.innerHTML = "";
+    manualProducts.forEach((product) => addProduct(product));
+    if (!manualProducts.length) addProduct();
+    updateIndustryStatus();
     return;
   }
   const recommended = getProductsForSelectedIndustries();
-  if (hasFilledProductRows() && !confirm("应用行业标签会用推荐产品重置当前申请产品，确定继续？")) return;
   productList.innerHTML = "";
   if (!recommended.length) {
-    addProduct();
+    manualProducts.forEach((product) => addProduct(product));
+    if (!manualProducts.length) addProduct();
     matchStatus.textContent = "这些行业标签暂未匹配到产品；可在产品名称里手动搜索补全。";
     return;
   }
   recommended.forEach((product) => addProduct(product));
+  manualProducts.forEach((product) => addProduct(product));
   updateIndustryStatus();
 }
 
 function matchProducts() {
-  applyIndustryTags();
+  applyIndustryTags({preserveManual: true});
 }
 
 async function copyText(text, label) {
@@ -961,7 +1010,7 @@ if (industryTagsEl) {
   industryTagsEl.addEventListener("click", (event) => {
     const btn = event.target.closest(".industry-tag[data-tag]");
     if (!btn) return;
-    removeIndustryTag(btn.dataset.tag);
+    toggleIndustryTag(btn.dataset.tag);
     generateEmail();
   });
 }

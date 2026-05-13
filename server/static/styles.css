@@ -255,6 +255,19 @@ textarea {
 }
 .combo-panel li.empty:hover { background: transparent; }
 
+.industry-picker {
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+.industry-picker-title {
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+}
 .industry-tags {
   display: flex;
   flex-wrap: wrap;
@@ -270,10 +283,10 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 26px;
-  padding: 0 7px 0 9px;
+  min-height: 30px;
+  padding: 0 10px;
   border: 1px solid #cbd5e1;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #f8fafc;
   color: #334155;
   font-size: 12px;
@@ -282,11 +295,23 @@ textarea {
   border-color: var(--accent);
   background: #f3f8fc;
 }
-.industry-tag b {
-  color: #64748b;
-  font-size: 14px;
-  line-height: 1;
+.industry-tag.selected {
+  border-color: var(--accent);
+  background: #eaf4fb;
+  color: #0f4f85;
+  font-weight: 600;
 }
+.industry-tag b {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+.industry-tag.selected b { background: #cfe5f6; color: #0f4f85; }
 
 .product-combo {
   position: relative;
@@ -358,6 +383,11 @@ textarea:focus {
 
 .section-heading {
   margin-bottom: 8px;
+}
+.product-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .compact-section {
@@ -450,7 +480,7 @@ textarea[readonly] {
 .product-header,
 .product-row {
   display: grid;
-  grid-template-columns: 44px minmax(210px, 1fr) 92px 88px 106px 92px 82px 112px 32px;
+  grid-template-columns: 44px minmax(190px, 1.35fr) 78px 76px 92px 78px 72px 96px 30px;
   gap: 6px;
   align-items: center;
 }

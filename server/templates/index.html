@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260512-industry-multi">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260513-generator-layout">
 </head>
 <body>
   <main class="app-shell">
@@ -24,24 +24,14 @@
         <section class="section-block customer-section">
           <div class="section-heading">
             <h2>客户与项目</h2>
-            <button class="primary-button" id="matchProductsButton" type="button">应用行业标签</button>
           </div>
           <div class="field-grid customer-grid">
-            <label>
-              <span>行业标签</span>
-              <div class="combo" id="industryCombo">
-                <input id="industryInput" type="text" value="" placeholder="可多选，如：游戏、直播、出海" autocomplete="off">
-                <button type="button" class="combo-toggle" aria-label="展开行业列表">▾</button>
-                <ul class="combo-panel" role="listbox" hidden></ul>
-              </div>
-              <div class="industry-tags" id="industryTags" aria-label="已选行业标签"></div>
-            </label>
             <label>
               <span>客户公司全称</span>
               <input id="customerName" value="" placeholder="如：广州某某网络科技有限公司">
             </label>
             <label>
-              <span>项目编号</span>
+              <span>商机编号</span>
               <input id="projectName" value="" placeholder="如：20260417xxxxxxx">
             </label>
             <label>
@@ -71,9 +61,17 @@
           <div class="section-heading">
             <div>
               <h2>申请产品</h2>
-              <p class="match-status" id="matchStatus">选择行业后会自动建议场景</p>
+              <p class="match-status" id="matchStatus">选择下方行业标签，系统会实时生成推荐产品。</p>
             </div>
-            <button class="primary-button" id="addProductButton" type="button">新增产品</button>
+            <div class="product-actions">
+              <button class="ghost-button" id="matchProductsButton" type="button">重新匹配折扣</button>
+              <button class="primary-button" id="addProductButton" type="button">新增产品</button>
+            </div>
+          </div>
+          <input id="industryInput" type="hidden" value="">
+          <div class="industry-picker" aria-label="行业标签">
+            <div class="industry-picker-title">行业标签</div>
+            <div class="industry-tags" id="industryTags" aria-label="选择行业标签"></div>
           </div>
           <div class="product-header" aria-hidden="true">
             <span>序号</span>
@@ -208,6 +206,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260512-industry-multi"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260513-generator-layout"></script>
 </body>
 </html>
