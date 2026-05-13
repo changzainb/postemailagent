@@ -7,6 +7,14 @@ set -euo pipefail
 
 APP_DIR="/opt/postemailagent"
 LOG_DIR="/var/log/postemailagent"
+ADMIN_PASSWORD="${POSTEMAIL_ADMIN_PASSWORD:-}"
+
+if [ -z "$ADMIN_PASSWORD" ]; then
+  ADMIN_PASSWORD="$(openssl rand -base64 18)"
+  GENERATED_ADMIN_PASSWORD=1
+else
+  GENERATED_ADMIN_PASSWORD=0
+fi
 
 echo "==> 安装系统依赖"
 apt-get update
@@ -28,7 +36,7 @@ echo "==> 初始化数据库（仅首次）"
 if [ ! -f "$APP_DIR/data/rules.db" ]; then
   cd "$APP_DIR"
   POSTEMAIL_DB="$APP_DIR/data/rules.db" \
-    "$APP_DIR/venv/bin/python" -m server.scripts.import_products
+    "$APP_DIR/venv/bin/python" -m server.scripts.import_products --admin-password "$ADMIN_PASSWORD"
   chown www-data:www-data "$APP_DIR/data/rules.db"
 fi
 
@@ -47,5 +55,11 @@ systemctl reload nginx
 
 echo "==> 完成。下一步："
 echo "    1) 修改 /etc/nginx/sites-available/postemailagent.conf 中的 server_name 为你的域名后 reload"
-echo "    2) 修改 /etc/systemd/system/postemailagent.service 中的 POSTEMAIL_SECRET_KEY 后 systemctl restart postemailagent"
-echo "    3) 修改默认管理员密码：sudo -u www-data $APP_DIR/venv/bin/python -m server.scripts.create_user admin <new-pass> --role admin"
+echo "    2) 修改 /etc/systemd/system/postemailagent.service 中的 POSTEMAIL_SECRET 后 systemctl restart postemailagent"
+if [ "$GENERATED_ADMIN_PASSWORD" = "1" ]; then
+  echo "    3) 首次管理员账号：admin"
+  echo "       首次管理员密码：$ADMIN_PASSWORD"
+  echo "       请立即保存到内部密码库，并上线前改成实名管理员账号"
+else
+  echo "    3) 已使用 POSTEMAIL_ADMIN_PASSWORD 初始化管理员密码"
+fi

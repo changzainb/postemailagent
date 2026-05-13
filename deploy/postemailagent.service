@@ -8,7 +8,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/postemailagent
 Environment="POSTEMAIL_DB=/opt/postemailagent/data/rules.db"
-Environment="POSTEMAIL_SECRET_KEY=change-me-in-prod"
+Environment="POSTEMAIL_SECRET=change-me-in-prod"
 ExecStart=/opt/postemailagent/venv/bin/gunicorn -w 2 -b 127.0.0.1:5050 server.app:app --access-logfile /var/log/postemailagent/access.log --error-logfile /var/log/postemailagent/error.log
 Restart=on-failure
 RestartSec=5

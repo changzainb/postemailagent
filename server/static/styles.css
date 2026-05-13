@@ -528,6 +528,11 @@ textarea[readonly] {
   white-space: nowrap;
 }
 
+.product-unit-field.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .price-value-wrap {
   display: flex;
   align-items: stretch;
@@ -712,7 +717,7 @@ textarea[readonly] {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .app-shell {
     width: min(100% - 20px, 1480px);
     padding: 10px 0;
@@ -759,6 +764,10 @@ textarea[readonly] {
     clip: auto;
     white-space: normal;
     font-size: 12px;
+  }
+
+  .product-unit-field.is-hidden {
+    display: none;
   }
 
   .product-row label:first-of-type,

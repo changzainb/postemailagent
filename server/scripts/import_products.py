@@ -1,7 +1,9 @@
-"""初始化场景、导入 71 个历史产品、创建默认管理员。"""
+"""初始化场景、导入历史产品、创建首个管理员。"""
 import argparse
 import json
+import os
 import re
+import secrets
 import sys
 from pathlib import Path
 
@@ -164,8 +166,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--md", default=str(PROJECT_ROOT / "applied-products.md"))
     parser.add_argument("--admin-user", default="admin")
-    parser.add_argument("--admin-password", default="admin123")
+    parser.add_argument("--admin-password", default=os.environ.get("POSTEMAIL_ADMIN_PASSWORD"))
     args = parser.parse_args()
+
+    if not args.admin_password:
+        args.admin_password = secrets.token_urlsafe(18)
+        print(f"generated admin password for {args.admin_user}: {args.admin_password}")
 
     init_db()
     md_path = Path(args.md)

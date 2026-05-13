@@ -278,7 +278,9 @@ function setupProductPriceControls(row, priceType = row.dataset.priceType || "di
     priceInput.placeholder = type === "fixed_price" ? "例如：0.357" : "例如：8";
   }
   if (unitField && unitInput) {
-    unitField.hidden = type !== "fixed_price";
+    unitField.hidden = false;
+    unitField.classList.toggle("is-hidden", type !== "fixed_price");
+    unitField.setAttribute("aria-hidden", type !== "fixed_price" ? "true" : "false");
     unitInput.disabled = type !== "fixed_price";
     if (type !== "fixed_price") unitInput.value = "";
   }

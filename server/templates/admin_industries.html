@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>行业 → 产品 匹配</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v=20260513-launch-ready">
   <style>
     .ind-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 24px; align-items: start; }
     .ind-side { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; max-height: calc(100vh - 130px); overflow-y: auto; }
@@ -138,8 +138,8 @@
     function renderIndustryList() {
       const ul = $("industryList");
       ul.innerHTML = state.industries.map((i) => `
-        <li data-key="${i.key}" data-id="${i.id}" class="${i.key === state.currentKey ? "active" : ""}">
-          <span class="name" title="${i.label}">${i.label}</span>
+        <li data-key="${escapeHtml(i.key)}" data-id="${escapeHtml(i.id)}" class="${i.key === state.currentKey ? "active" : ""}">
+          <span class="name" title="${escapeHtml(i.label)}">${escapeHtml(i.label)}</span>
           <span class="row-actions">
             <button data-act="rename" title="重命名">改名</button>
             <button data-act="delete" title="删除">删</button>
@@ -238,14 +238,14 @@
         div.className = "scenario-group";
         div.innerHTML = `
           <h3>
-            <span>${g.label}（${g.items.length}）</span>
+            <span>${escapeHtml(g.label)}（${g.items.length}）</span>
             <span class="group-actions" data-sid="${sid}">全选 / 反选</span>
           </h3>
           <div class="product-grid">
             ${g.items.map((p) => `
-              <label class="${state.selected.has(p.id) ? "checked" : ""}" data-name="${p.name.toLowerCase()}">
+              <label class="${state.selected.has(p.id) ? "checked" : ""}" data-name="${escapeHtml(p.name.toLowerCase())}">
                 <input type="checkbox" data-pid="${p.id}" ${state.selected.has(p.id) ? "checked" : ""}>
-                <span>${p.name}</span>
+                <span>${escapeHtml(p.name)}</span>
               </label>
             `).join("")}
           </div>
