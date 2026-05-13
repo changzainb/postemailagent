@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>特批价格邮件生成器</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260513-generator-layout">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260513-account-required">
 </head>
 <body>
   <main class="app-shell">
@@ -31,12 +31,12 @@
               <input id="customerName" value="" placeholder="如：广州某某网络科技有限公司">
             </label>
             <label>
-              <span>商机编号</span>
-              <input id="projectName" value="" placeholder="如：20260417xxxxxxx">
+              <span>客户腾讯云账号 ID</span>
+              <input id="customerAccount" value="" required>
             </label>
             <label>
-              <span>客户腾讯云账号 ID</span>
-              <input id="customerAccount" value="" placeholder="十位数字">
+              <span>商机编号</span>
+              <input id="projectName" value="" placeholder="如：20260417xxxxxxx">
             </label>
             <label>
               <span>申请开始日期</span>
@@ -206,6 +206,6 @@
     </article>
   </template>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=20260513-generator-layout"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=20260513-account-required"></script>
 </body>
 </html>

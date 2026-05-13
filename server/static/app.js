@@ -568,26 +568,31 @@ async function matchProductName(row) {
 }
 
 function buildThresholdWarnings(products) {
-  return products.flatMap((product, index) => {
-    const warnings = [];
+  const warnings = [];
+  if (!fields.customerAccount.value.trim()) {
+    warnings.push("客户腾讯云账号 ID 必填，填写后才能复制正文。");
+  }
+  products.forEach((product, index) => {
+    const productWarnings = [];
     if (!product.matched && product.name && !product.suggesting) {
-      warnings.push(`产品${index + 1} ${product.name}：商务库未登记，已通知商务补登。`);
+      productWarnings.push(`产品${index + 1} ${product.name}：商务库未登记，已通知商务补登。`);
     }
     if (product.noCommission && parseCommissionPercent(product.commission) > 0) {
-      warnings.push(`产品${index + 1} ${product.name}：该产品不支持返佣。`);
+      productWarnings.push(`产品${index + 1} ${product.name}：该产品不支持返佣。`);
     }
     if (product.matched && product.priceType !== "fixed_price") {
       const discount = parseDiscount(product.discount);
       const breakFloor = parseDiscount(product.breakthroughDiscount);
       if (discount != null && breakFloor != null && discount < breakFloor - 0.001) {
-        warnings.push(`产品${index + 1} ${product.name}：当前 ${product.discount} 低于商务突破政策 ${product.breakthroughDiscount}，建议先确认。`);
+        productWarnings.push(`产品${index + 1} ${product.name}：当前 ${product.discount} 低于商务突破政策 ${product.breakthroughDiscount}，建议先确认。`);
       }
       if (discount == null && product.discount) {
-        warnings.push(`产品${index + 1} ${product.name}：折扣格式没识别到，建议写成 9折、95折、6折。`);
+        productWarnings.push(`产品${index + 1} ${product.name}：折扣格式没识别到，建议写成 9折、95折、6折。`);
       }
     }
-    return warnings;
+    productWarnings.forEach((warning) => warnings.push(warning));
   });
+  return warnings;
 }
 
 function getDuplicateProductGroups() {
@@ -722,6 +727,8 @@ function generateEmail() {
   const hasFixedPrice = products.some((product) => product.priceType === "fixed_price");
   const applicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
   const bodyApplicationLabel = hasFixedPrice ? "价格返佣申请" : "折扣返佣申请";
+  const accountMissing = !fields.customerAccount.value.trim();
+  fields.customerAccount.classList.toggle("required-missing", accountMissing);
   // 标记缺折扣/返佣的行
   let missingFields = 0;
   document.querySelectorAll(".product-row").forEach((row) => {
@@ -748,8 +755,11 @@ function generateEmail() {
   // 复制按钮根据缺失情况禁用
   const copyBodyBtn = document.getElementById("copyBodyButton");
   if (copyBodyBtn) {
-    copyBodyBtn.disabled = missingFields > 0;
-    copyBodyBtn.title = missingFields > 0 ? `还有 ${missingFields} 行价格、单位或返佣未填` : "";
+    copyBodyBtn.disabled = missingFields > 0 || accountMissing;
+    const titles = [];
+    if (accountMissing) titles.push("客户腾讯云账号 ID 必填");
+    if (missingFields > 0) titles.push(`还有 ${missingFields} 行价格、单位或返佣未填`);
+    copyBodyBtn.title = titles.join("；");
   }
 
   emailSubject.value = `${fields.customerName.value.trim() || "客户"}${applicationLabel}--广州西骋`;

@@ -370,6 +370,12 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(18, 97, 166, 0.12);
 }
 
+input.required-missing {
+  border-color: var(--danger);
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.10);
+}
+
 .button-field {
   align-content: end;
 }
