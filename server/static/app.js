@@ -703,6 +703,89 @@ function getCompetitorPool() {
   return competitorPools.cloud;
 }
 
+function getUniqueProductNames(limit = 3) {
+  const seen = new Set();
+  const names = [];
+  getProducts().forEach((product) => {
+    const name = normalizeSentence(product.name);
+    const key = normalizeSearchText(name);
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    names.push(name);
+  });
+  return names.slice(0, limit);
+}
+
+function simplifyProjectProductName(name) {
+  const text = String(name || "").trim();
+  const lower = text.toLowerCase();
+  if (!text) return "";
+  if (lower.includes("trtc") || text.includes("实时音视频")) return "实时音视频 TRTC";
+  if (text.includes("云点播")) return "云点播";
+  if (text.includes("边缘加速平台") || lower.includes("eo")) return "边缘加速平台 EO";
+  if (lower.includes("cvm") || text.includes("云服务器")) return "云服务器 CVM";
+  if (lower.includes("cos") || text.includes("对象存储")) return "对象存储 COS";
+  if (text.includes("天御")) return "天御安全";
+  if (text.includes("人脸核身")) return "人脸核身";
+  if (lower.includes("ckafka")) return "CKafka";
+  if (lower.includes("rocketmq")) return "RocketMQ";
+  return text.split(/[\-（(]/)[0].trim() || text;
+}
+
+function getProjectProductNames(limit = 2) {
+  const seen = new Set();
+  const names = [];
+  getUniqueProductNames(8).forEach((name) => {
+    const simplifiedName = simplifyProjectProductName(name);
+    const key = normalizeSearchText(simplifiedName);
+    if (!simplifiedName || seen.has(key)) return;
+    seen.add(key);
+    names.push(simplifiedName);
+  });
+  return names.slice(0, limit);
+}
+
+function getProjectFocusText() {
+  const source = [
+    Array.from(selectedIndustryTags).join(" "),
+    fields.currentProject.value,
+    getUniqueProductNames(6).join(" "),
+  ].join(" ").toLowerCase();
+  if (/直播|语音|社交|连麦|k歌|rtc|trtc|即时通讯|会议|im/.test(source)) {
+    return "实时互动体验、并发稳定性和音视频成本";
+  }
+  if (/短剧|漫剧|漫画|动漫|点播|视频|媒资|aigc|生图|生视频|内容/.test(source)) {
+    return "内容生产处理、素材存储分发和调用成本";
+  }
+  if (/出海|海外|跨境|cdn|eo|边缘|加速/.test(source)) {
+    return "访问加速、跨地域覆盖和流量成本";
+  }
+  if (/cvm|云服务器|服务器|数据库|mysql|redis|ckafka|rocketmq|计算/.test(source)) {
+    return "计算资源、数据服务稳定性和长期使用成本";
+  }
+  if (/cos|对象存储|存储/.test(source)) {
+    return "素材存储、访问流量和存储成本";
+  }
+  if (/安全|审核|天御|人脸|核身|风控/.test(source)) {
+    return "内容安全、风控合规和调用成本";
+  }
+  return "稳定性、后续用量和整体云资源成本";
+}
+
+function buildProjectBackgroundText(currentProject) {
+  const industries = Array.from(selectedIndustryTags).slice(0, 2);
+  const productNames = getProjectProductNames(2);
+  const industryPart = industries.length ? `，业务场景以${industries.join("、")}为主` : "";
+  const productPart = productNames.length
+    ? `本次申请主要涉及${productNames.join("、")}${productNames.length > 1 ? "等" : ""}相关产品`
+    : "本次申请涉及客户后续使用的核心云产品";
+  const focusText = getProjectFocusText();
+  const opening = currentProject
+    ? `客户当前正在推进${currentProject}${industryPart}，项目已进入测试选型和成本测算阶段。`
+    : `客户当前项目已进入测试选型和成本测算阶段${industryPart}。`;
+  return `${opening}${productPart}，客户重点关注${focusText}。为提升腾讯云方案的商务竞争力，需要通过本次折扣/返佣支持客户完成选型并推动项目落地。`;
+}
+
 function buildReasonText() {
   const customerName = fields.customerName.value.trim() || "客户";
   const foundedYear = normalizeSentence(fields.foundedYear.value);
@@ -713,9 +796,7 @@ function buildReasonText() {
   if (companyScale) parts.push(`公司规模${companyScale}`);
   if (currentProject) parts.push(`目前${currentProject}`);
   fields.customerBackground.value = `${parts.join("，")}。`;
-  fields.projectBackground.value = currentProject
-    ? `客户当前项目已进入测试、选型和成本测算阶段，当前项目情况为${currentProject}，需要更有竞争力的商务条件，支撑后续规模化使用。`
-    : "客户当前项目已进入测试、选型和成本测算阶段，需要通过折扣返佣支持后续规模化使用。";
+  fields.projectBackground.value = buildProjectBackgroundText(currentProject);
   fields.competition.value = formatCompetitorQuote(pickRandomItems(getCompetitorPool()));
   fields.agentContribution.value = fixedApplicationInfo.agentContribution;
   generateEmail();
